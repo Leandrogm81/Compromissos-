@@ -73,3 +73,38 @@ export async function suggestReminderFields(text: string, currentTitle?: string)
     throw new Error("Não foi possível obter sugestões da IA.");
   }
 }
+
+export async function processVoiceTranscript(transcript: string): Promise<string> {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    console.log("AI processing for voice disabled. API_KEY not provided.");
+    return transcript;
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  const prompt = `
+    Sua tarefa é atuar como um corretor ortográfico e gramatical. Você receberá um texto que foi transcrito de uma gravação de voz.
+    NÃO altere o significado ou o estilo do texto. NÃO adicione palavras que não foram ditas.
+    Sua única função é:
+    1. Corrigir erros de ortografia e gramática.
+    2. Adicionar pontuação (vírgulas, pontos finais, etc.) para tornar o texto coerente e legível.
+    3. Manter a estrutura das frases o mais próximo possível do original.
+    A resposta deve conter APENAS o texto corrigido.
+
+    Texto para corrigir: "${transcript}"
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+    });
+
+    return response.text.trim();
+  } catch (error) {
+    console.error("Error calling Gemini API for voice processing:", error);
+    // Fallback to the original transcript on error
+    return transcript;
+  }
+}

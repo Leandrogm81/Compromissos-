@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 
 interface SpeechToTextOptions {
@@ -14,6 +13,7 @@ export const useSpeechToText = ({ onResult, onEnd }: SpeechToTextOptions) => {
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
+  const fullTranscriptRef = useRef('');
 
   useEffect(() => {
     if (!isSupported) {
@@ -27,14 +27,14 @@ export const useSpeechToText = ({ onResult, onEnd }: SpeechToTextOptions) => {
     recognition.continuous = true;
 
     recognition.onresult = (event: any) => {
-      let finalTranscript = '';
+      let finalTranscriptChunk = '';
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript;
+          finalTranscriptChunk += event.results[i][0].transcript;
         }
       }
-      if (finalTranscript) {
-        onResult(finalTranscript.trim());
+      if (finalTranscriptChunk) {
+        fullTranscriptRef.current += finalTranscriptChunk.trim() + ' ';
       }
     };
 
@@ -45,6 +45,9 @@ export const useSpeechToText = ({ onResult, onEnd }: SpeechToTextOptions) => {
     
     recognition.onend = () => {
         setIsListening(false);
+        if (fullTranscriptRef.current) {
+            onResult(fullTranscriptRef.current.trim());
+        }
         if (onEnd) onEnd();
     }
 
@@ -57,6 +60,7 @@ export const useSpeechToText = ({ onResult, onEnd }: SpeechToTextOptions) => {
 
   const startListening = () => {
     if (recognitionRef.current && !isListening) {
+      fullTranscriptRef.current = '';
       setError(null);
       recognitionRef.current.start();
       setIsListening(true);

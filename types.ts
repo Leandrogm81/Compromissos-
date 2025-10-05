@@ -16,6 +16,13 @@ export enum ReminderStatus {
   Cancelled = 'cancelled',
 }
 
+export enum Recurrence {
+  None = 'none',
+  Daily = 'daily',
+  Weekly = 'weekly',
+  Monthly = 'monthly',
+}
+
 export type Reminder = {
   id?: number;
   title: string;
@@ -25,6 +32,7 @@ export type Reminder = {
   reminders: number[];  // minutos antes (ex.: [5, 30])
   attachments: Attachment[];
   status: ReminderStatus;
+  recurrence: Recurrence;
   createdAt: string;
   updatedAt: string;
 };

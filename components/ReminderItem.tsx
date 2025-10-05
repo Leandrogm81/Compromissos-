@@ -1,15 +1,16 @@
 
 import React from 'react';
 import type { Reminder } from '../types';
-import { ReminderStatus } from '../types';
+import { ReminderStatus, Recurrence } from '../types';
 import { differenceInHours } from 'date-fns';
-import { Trash2, Edit, CheckCircle2, Circle } from 'lucide-react';
+import { Trash2, Edit, CheckCircle2, Circle, Repeat } from 'lucide-react';
 
 interface ReminderItemProps {
   reminder: Reminder;
   onToggleStatus: () => void;
   onDelete: () => void;
   onEdit: () => void;
+  onViewImage: (url: string) => void;
 }
 
 const BRAZIL_TIME_ZONE = 'America/Sao_Paulo';
@@ -17,6 +18,13 @@ const BRAZIL_TIME_ZONE = 'America/Sao_Paulo';
 // Define constants for proximity in hours
 const HOURS_IN_A_DAY = 24;
 const HOURS_IN_A_WEEK = 7 * HOURS_IN_A_DAY; // 168 hours
+
+const recurrenceTextMap: Record<Recurrence, string> = {
+    [Recurrence.None]: '',
+    [Recurrence.Daily]: 'Repete diariamente',
+    [Recurrence.Weekly]: 'Repete semanalmente',
+    [Recurrence.Monthly]: 'Repete mensalmente',
+};
 
 /**
  * Determines the border color based on the reminder's proximity.
@@ -43,7 +51,7 @@ const getProximityClass = (datetime: string, isDone: boolean): string => {
 };
 
 
-const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, onDelete, onEdit }) => {
+const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, onDelete, onEdit, onViewImage }) => {
   const isDone = reminder.status === ReminderStatus.Done;
   
   const reminderDate = new Date(reminder.datetime);
@@ -57,6 +65,8 @@ const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, o
   }).replace(',', ' às');
   
   const proximityClass = getProximityClass(reminder.datetime, isDone);
+  
+  const imageAttachments = reminder.attachments?.filter(att => att.type.startsWith('image/')) || [];
 
 
   return (
@@ -73,7 +83,7 @@ const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, o
                 : <Circle className="text-slate-400 dark:text-slate-500 mt-1" size={20}/>
             }
         </button>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <p className={`font-semibold ${isDone ? 'line-through text-slate-500' : 'text-slate-800 dark:text-slate-100'}`}>
             {reminder.title}
           </p>
@@ -81,9 +91,28 @@ const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, o
             {formattedDate}
           </p>
            {reminder.description && (
-             <p className="text-sm mt-2 text-slate-500 dark:text-slate-400 whitespace-pre-wrap">
+             <p className="text-sm mt-2 text-slate-500 dark:text-slate-400 whitespace-pre-wrap break-words">
                {reminder.description}
              </p>
+           )}
+           {reminder.recurrence !== Recurrence.None && !isDone && (
+              <div className="flex items-center gap-1.5 mt-2 text-xs text-slate-500 dark:text-slate-400">
+                <Repeat size={12} />
+                <span>{recurrenceTextMap[reminder.recurrence]}</span>
+              </div>
+           )}
+           {imageAttachments.length > 0 && (
+            <div className="mt-3 flex gap-2 flex-wrap">
+              {imageAttachments.map(att => (
+                <img
+                  key={att.id}
+                  src={att.localUrl}
+                  alt={att.name}
+                  className="h-16 w-16 rounded-md object-cover cursor-pointer transition-transform hover:scale-105"
+                  onClick={() => onViewImage(att.localUrl!)}
+                />
+              ))}
+            </div>
            )}
         </div>
         <div className="flex gap-1">

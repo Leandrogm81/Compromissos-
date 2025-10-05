@@ -10,9 +10,10 @@ import { ReminderStatus } from '../types';
 
 interface ListPageProps {
   setView: (view: AppView) => void;
+  onViewImage: (url: string) => void;
 }
 
-const ListPage: React.FC<ListPageProps> = ({ setView }) => {
+const ListPage: React.FC<ListPageProps> = ({ setView, onViewImage }) => {
   const { reminders, toggleReminderStatus, deleteReminder } = useReminders();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -54,6 +55,7 @@ const ListPage: React.FC<ListPageProps> = ({ setView }) => {
             onToggleStatus={toggleReminderStatus}
             onDelete={deleteReminder}
             onEdit={(id) => setView({ page: Page.Form, reminderId: id.toString() })}
+            onViewImage={onViewImage}
           />
         ) : (
           <div className="text-center py-10">

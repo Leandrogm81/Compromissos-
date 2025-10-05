@@ -1,55 +1,42 @@
 
+
 import { useState, useEffect, useCallback } from 'react';
-import { getSubscription, subscribeUser, unsubscribeUser } from '../services/notificationService';
+import { requestNotificationPermission } from '../services/notificationService';
 
 export const usePushManager = () => {
-  const [isSubscribed, setIsSubscribed] = useState(false);
-  const [subscription, setSubscription] = useState<PushSubscription | null>(null);
-  const [permission, setPermission] = useState<NotificationPermission>(Notification.permission);
+  const [permission, setPermission] = useState<NotificationPermission>('default');
   const [isLoading, setIsLoading] = useState(true);
 
-  const checkSubscription = useCallback(async () => {
-    setIsLoading(true);
-    const sub = await getSubscription();
-    setSubscription(sub);
-    setIsSubscribed(!!sub);
-    setPermission(Notification.permission);
+  const checkPermissionState = useCallback(() => {
+    if ('Notification' in window) {
+      setPermission(Notification.permission);
+    }
     setIsLoading(false);
   }, []);
 
   useEffect(() => {
+    checkPermissionState();
+    // For browsers that support it, listen for changes in the permission status.
     if ('permissions' in navigator) {
-        navigator.permissions.query({name: 'notifications'}).then(permissionStatus => {
-            checkSubscription();
-            permissionStatus.onchange = () => {
-                setPermission(permissionStatus.state);
-                checkSubscription();
-            };
-        });
-    } else {
-        checkSubscription();
+      navigator.permissions.query({ name: 'notifications' }).then(permissionStatus => {
+        // Handle both Chromium (onchange) and Firefox (addEventListener)
+        const handleChange = () => checkPermissionState();
+        try {
+            permissionStatus.onchange = handleChange;
+        } catch (e) {
+            // Fallback for older browsers
+            permissionStatus.addEventListener('change', handleChange);
+        }
+      });
     }
-  }, [checkSubscription]);
+  }, [checkPermissionState]);
 
-  const subscribe = async () => {
+  const request = async () => {
     setIsLoading(true);
-    const result = await Notification.requestPermission();
-    if (result === 'granted') {
-        const sub = await subscribeUser();
-        setSubscription(sub);
-        setIsSubscribed(!!sub);
-    }
+    const result = await requestNotificationPermission();
     setPermission(result);
     setIsLoading(false);
   };
 
-  const unsubscribe = async () => {
-    setIsLoading(true);
-    await unsubscribeUser();
-    setSubscription(null);
-    setIsSubscribed(false);
-    setIsLoading(false);
-  };
-
-  return { isSubscribed, subscription, permission, isLoading, subscribe, unsubscribe };
+  return { permission, isLoading, request };
 };

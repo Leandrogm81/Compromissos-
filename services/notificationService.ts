@@ -1,79 +1,90 @@
 
 
-// This would be in your .env file
-// Fix: Replaced placeholder VAPID key with a valid one to enable push subscriptions.
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BDRCqgR-g-i1gUnE09eCaD3R0s7FpWk0T6E2a9p-h5g-Zjk-V3yT8w-sdfghjkl';
+import type { Reminder } from '../types';
+import { ReminderStatus } from '../types';
 
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
+// In-memory store for timeout IDs. This is a limitation of a client-side only approach,
+// as these will be cleared on page refresh. The app's main logic will re-schedule them.
+const scheduledTimeouts = new Map<number, any[]>();
 
-export async function getSubscription(): Promise<PushSubscription | null> {
-  const registration = await navigator.serviceWorker.ready;
-  return registration.pushManager.getSubscription();
-}
-
-export async function subscribeUser(): Promise<PushSubscription | null> {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    console.warn('Push messaging is not supported');
-    return null;
-  }
-
-  const registration = await navigator.serviceWorker.ready;
-  const existingSubscription = await registration.pushManager.getSubscription();
-
-  if (existingSubscription) {
-    console.log('User is already subscribed.');
-    return existingSubscription;
-  }
-
-  try {
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+/**
+ * Shows a notification using the service worker registration.
+ * This is preferred over `new Notification()` to ensure consistent
+ * behavior and appearance (e.g., using icons from the manifest).
+ */
+function showNotification(title: string, options: NotificationOptions) {
+  if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+    navigator.serviceWorker.ready.then(registration => {
+      registration.showNotification(title, options);
     });
-    console.log('User is subscribed:', subscription);
-    // TODO: Send subscription to your backend server
-    return subscription;
-  } catch (error) {
-    console.error('Failed to subscribe the user: ', error);
-    return null;
   }
 }
 
-export async function unsubscribeUser(): Promise<boolean> {
-  const subscription = await getSubscription();
-  if (subscription) {
-    // TODO: Also notify your backend server to remove the subscription
-    return subscription.unsubscribe();
+/**
+ * Requests permission from the user to show notifications.
+ * @returns The permission state: 'granted', 'denied', or 'default'.
+ */
+export async function requestNotificationPermission(): Promise<NotificationPermission> {
+  if (!('Notification' in window)) {
+    console.warn('This browser does not support desktop notification');
+    return 'denied';
   }
-  return false;
+  return Notification.requestPermission();
 }
 
-export function scheduleLocalNotification(title: string, options: NotificationOptions, delayInMs: number) {
-    if (!('Notification' in window)) {
-        alert('Este navegador não suporta notificações locais.');
-        return;
-    }
+/**
+ * Schedules all notifications for a given reminder.
+ * It will schedule notifications for the minutes defined in `reminder.reminders` array.
+ */
+export function scheduleNotificationsForReminder(reminder: Reminder) {
+  if (!reminder.id || reminder.status !== ReminderStatus.Pending) {
+    return;
+  }
 
-    if (Notification.permission === 'granted') {
-        setTimeout(() => {
-            new Notification(title, options);
-        }, delayInMs);
-    } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then(permission => {
-            if (permission === 'granted') {
-                setTimeout(() => {
-                    new Notification(title, options);
-                }, delayInMs);
-            }
+  // A user must grant permission for notifications, otherwise scheduling is skipped.
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') {
+    return;
+  }
+
+  cancelNotificationsForReminder(reminder.id); // Clear any previously scheduled notifications for this reminder
+
+  const now = new Date().getTime();
+  const reminderTime = new Date(reminder.datetime).getTime();
+  const newTimeoutIds: any[] = [];
+  const commonOptions: NotificationOptions = {
+    icon: '/icon-192.png',
+    badge: '/badge-72.png',
+    data: { url: '/' }, // URL to open when the user clicks the notification.
+  };
+
+  // Schedule pre-reminders based on the 'reminders' array (e.g., [5, 30] minutes before)
+  reminder.reminders.forEach(minutesBefore => {
+    const preReminderTime = reminderTime - minutesBefore * 60 * 1000;
+    const delay = preReminderTime - now;
+
+    if (delay > 0) {
+      const timeoutId = setTimeout(() => {
+        showNotification(`Lembrete em ${minutesBefore} min: ${reminder.title}`, {
+          body: reminder.description || 'Prepare-se para o seu evento.',
+          tag: `reminder-${reminder.id}-${minutesBefore}`, // Tag to prevent duplicate notifications
+          ...commonOptions,
         });
+      }, delay);
+      newTimeoutIds.push(timeoutId);
     }
+  });
+
+  if (newTimeoutIds.length > 0) {
+    scheduledTimeouts.set(reminder.id, newTimeoutIds);
+  }
+}
+
+/**
+ * Cancels all scheduled notifications for a specific reminder ID.
+ */
+export function cancelNotificationsForReminder(reminderId: number) {
+  if (scheduledTimeouts.has(reminderId)) {
+    scheduledTimeouts.get(reminderId)!.forEach(clearTimeout);
+    scheduledTimeouts.delete(reminderId);
+  }
 }

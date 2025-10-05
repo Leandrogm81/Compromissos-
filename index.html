@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
   <head>
@@ -48,5 +47,25 @@
   <body class="bg-gray-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 antialiased">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          // In sandboxed environments, relative paths can be resolved incorrectly.
+          // To fix this definitively, we construct an absolute URL using the
+          // page's actual origin, ensuring the script is loaded correctly.
+          const swUrl = `${window.location.origin}/sw.js`;
+          
+          navigator.serviceWorker.register(swUrl)
+            .then(registration => {
+              console.log('Service Worker registered successfully:', registration);
+            })
+            .catch(error => {
+              console.error('Service Worker registration failed:', error);
+            });
+        });
+      }
+    </script>
   </body>
 </html>

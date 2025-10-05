@@ -10,9 +10,10 @@ import { Archive } from 'lucide-react';
 
 interface ResolvedPageProps {
   setView: (view: AppView) => void;
+  onViewImage: (url: string) => void;
 }
 
-const ResolvedPage: React.FC<ResolvedPageProps> = ({ setView }) => {
+const ResolvedPage: React.FC<ResolvedPageProps> = ({ setView, onViewImage }) => {
   const { reminders, toggleReminderStatus, deleteReminder } = useReminders();
 
   const resolvedReminders = useMemo(() => {
@@ -30,6 +31,7 @@ const ResolvedPage: React.FC<ResolvedPageProps> = ({ setView }) => {
             onToggleStatus={toggleReminderStatus}
             onDelete={deleteReminder}
             onEdit={(id) => setView({ page: Page.Form, reminderId: id.toString() })} // Editing is disabled in ReminderItem, but prop is needed
+            onViewImage={onViewImage}
           />
         ) : (
           <div className="text-center py-16">

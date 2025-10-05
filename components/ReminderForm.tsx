@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { Reminder, Attachment } from '../types';
+import { Recurrence } from '../types';
 import VoiceInput from './VoiceInput';
 import AttachmentUploader from './AttachmentUploader';
 import { useAiAssist } from '../hooks/useAiAssist';
@@ -14,42 +15,43 @@ interface ReminderFormProps {
 
 const BRAZIL_TIME_ZONE = 'America/Sao_Paulo';
 
-const getSaoPauloDateParts = (isoString?: string) => {
-    const date = isoString ? new Date(isoString) : new Date();
-    
-    // O locale 'sv-SE' (Sueco) formata a data como YYYY-MM-DD
-    const datePart = new Intl.DateTimeFormat('sv-SE', {
-        timeZone: BRAZIL_TIME_ZONE,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-    }).format(date);
-    
-    // O locale 'en-GB' (Reino Unido) formata a hora como HH:mm (24h)
-    const timePart = new Intl.DateTimeFormat('en-GB', {
-        timeZone: BRAZIL_TIME_ZONE,
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-    }).format(date);
+/**
+ * Formats a Date object into a 'YYYY-MM-DDTHH:mm' string suitable for datetime-local input,
+ * correctly representing the local time in São Paulo.
+ * @param date - The Date object to format.
+ * @returns A string in the format 'YYYY-MM-DDTHH:mm'.
+ */
+const toSaoPauloLocalISO = (date: Date): string => {
+  const pad = (num: number) => num.toString().padStart(2, '0');
+  
+  // Get parts in UTC and manually adjust. A full library like date-fns-tz would be better,
+  // but this avoids dependency issues and is more robust than using locale strings.
+  // Note: Brazil does not currently observe DST, so UTC-3 is a stable offset.
+  const spDate = new Date(date.toLocaleString('en-US', { timeZone: BRAZIL_TIME_ZONE }));
 
-    return { date: datePart, time: timePart };
+  const year = spDate.getFullYear();
+  const month = pad(spDate.getMonth() + 1);
+  const day = pad(spDate.getDate());
+  const hours = pad(spDate.getHours());
+  const minutes = pad(spDate.getMinutes());
+  
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
 };
+
 
 const ReminderForm: React.FC<ReminderFormProps> = ({ onSubmit, initialData, onCancel }) => {
   const [title, setTitle] = useState(initialData?.title || '');
   const [description, setDescription] = useState(initialData?.description || '');
   
-  const { date: initialDate, time: initialTime } = getSaoPauloDateParts(initialData?.datetime);
+  const initialDateTime = initialData?.datetime ? toSaoPauloLocalISO(new Date(initialData.datetime)) : toSaoPauloLocalISO(new Date());
+  const [dateTimeLocal, setDateTimeLocal] = useState(initialDateTime);
 
-  const [date, setDate] = useState(initialDate);
-  const [time, setTime] = useState(initialTime);
-
+  const [recurrence, setRecurrence] = useState<Recurrence>(initialData?.recurrence || Recurrence.None);
   const [attachments, setAttachments] = useState<Attachment[]>(initialData?.attachments || []);
 
   const { isSuggesting, getSuggestions } = useAiAssist();
   
-  const handleVoiceResult = (transcript: string) => {
+  const handleProcessedVoiceResult = (transcript: string) => {
     setDescription(prev => prev ? `${prev}\n${transcript}` : transcript);
   };
   
@@ -60,16 +62,12 @@ const ReminderForm: React.FC<ReminderFormProps> = ({ onSubmit, initialData, onCa
     }
     const suggestions = await getSuggestions(description, title);
     if (suggestions) {
-        // If the title was empty, update it from the suggestion.
-        // Otherwise, keep the user's existing title.
         if (!title) {
           setTitle(suggestions.title);
         }
         setDescription(suggestions.description || '');
         if(suggestions.datetime) {
-            const { date: suggestedDate, time: suggestedTime } = getSaoPauloDateParts(suggestions.datetime);
-            setDate(suggestedDate);
-            setTime(suggestedTime);
+            setDateTimeLocal(toSaoPauloLocalISO(new Date(suggestions.datetime)));
         }
     }
   }
@@ -82,14 +80,19 @@ const ReminderForm: React.FC<ReminderFormProps> = ({ onSubmit, initialData, onCa
         return;
       }
       
-      // Workaround for a broken zonedTimeToUtc function from the CDN module.
-      // Manually construct an ISO string with Brazil's timezone offset (UTC-3)
-      // and parse it to get the correct UTC date object.
-      const dateTimeInBrazil = `${date}T${time}:00-03:00`;
+      // Explicitly interpret the local datetime string as being in São Paulo's timezone (UTC-3)
+      // and convert it to a proper UTC Date object for storage.
+      const dateTimeInBrazil = `${dateTimeLocal}:00-03:00`;
       const utcDateTime = new Date(dateTimeInBrazil);
 
       if (isNaN(utcDateTime.getTime())) {
-        throw new Error('Data ou hora inválida resultou em uma data inválida.');
+        throw new Error('Data ou hora inválida.');
+      }
+      
+      // Validation: Prevent scheduling reminders in the past.
+      if (utcDateTime.getTime() < new Date().getTime()) {
+          toast.error('Não é possível agendar lembretes no passado.');
+          return;
       }
 
       onSubmit({
@@ -99,12 +102,16 @@ const ReminderForm: React.FC<ReminderFormProps> = ({ onSubmit, initialData, onCa
         timezone: BRAZIL_TIME_ZONE,
         reminders: [5, 30], // Placeholder
         attachments,
+        recurrence,
       });
     } catch (error) {
       console.error("Error preparing reminder data:", error);
-      toast.error("Falha ao processar data/hora. Verifique os valores.");
+      toast.error(error instanceof Error ? error.message : "Falha ao processar data/hora.");
     }
   };
+  
+  // The minimum selectable datetime for the input, to prevent past dates.
+  const minDateTime = toSaoPauloLocalISO(new Date());
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -134,7 +141,7 @@ const ReminderForm: React.FC<ReminderFormProps> = ({ onSubmit, initialData, onCa
             rows={4}
             className="block w-full rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-white dark:bg-slate-800 sm:text-sm"
           />
-          <VoiceInput onResult={handleVoiceResult} />
+          <VoiceInput onResult={handleProcessedVoiceResult} />
         </div>
         {process.env.API_KEY && (
              <button
@@ -148,34 +155,37 @@ const ReminderForm: React.FC<ReminderFormProps> = ({ onSubmit, initialData, onCa
             </button>
         )}
       </div>
+      
+      <div>
+          <label htmlFor="datetime" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+            Data e Hora
+          </label>
+          <input
+            type="datetime-local"
+            id="datetime"
+            value={dateTimeLocal}
+            onChange={e => setDateTimeLocal(e.target.value)}
+            min={minDateTime}
+            className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-white dark:bg-slate-800 sm:text-sm"
+            required
+          />
+      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="date" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-            Data
+      <div>
+          <label htmlFor="recurrence" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+            Repetir
           </label>
-          <input
-            type="date"
-            id="date"
-            value={date}
-            onChange={e => setDate(e.target.value)}
+          <select
+            id="recurrence"
+            value={recurrence}
+            onChange={e => setRecurrence(e.target.value as Recurrence)}
             className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-white dark:bg-slate-800 sm:text-sm"
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="time" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-            Hora
-          </label>
-          <input
-            type="time"
-            id="time"
-            value={time}
-            onChange={e => setTime(e.target.value)}
-            className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-white dark:bg-slate-800 sm:text-sm"
-            required
-          />
-        </div>
+          >
+            <option value={Recurrence.None}>Nunca</option>
+            <option value={Recurrence.Daily}>Diariamente</option>
+            <option value={Recurrence.Weekly}>Semanalmente</option>
+            <option value={Recurrence.Monthly}>Mensalmente</option>
+          </select>
       </div>
       
       <div>

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import type { AppView } from '../App';
 import { Page } from '../App';
@@ -8,6 +7,7 @@ import ReminderForm from '../components/ReminderForm';
 import Layout from '../components/Layout';
 import { ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { usePushManager } from '../hooks/usePushManager';
 
 interface FormPageProps {
   setView: (view: AppView) => void;
@@ -18,6 +18,7 @@ const FormPage: React.FC<FormPageProps> = ({ setView, reminderId }) => {
   const [initialData, setInitialData] = useState<Reminder | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const { addReminder, updateReminder, getReminderById } = useReminders();
+  const { permission, request: requestNotifications } = usePushManager();
   
   const isEditing = !!reminderId;
 
@@ -42,6 +43,40 @@ const FormPage: React.FC<FormPageProps> = ({ setView, reminderId }) => {
       } else {
         await addReminder(formData);
         toast.success('Lembrete criado!');
+        
+        // After creating a reminder, if permission hasn't been asked or granted/denied,
+        // prompt the user to enable notifications.
+        const hasBeenAsked = localStorage.getItem('hasBeenAskedForNotifications');
+        if (permission === 'default' && !hasBeenAsked) {
+            localStorage.setItem('hasBeenAskedForNotifications', 'true');
+            toast(
+                (t) => (
+                  <div className="flex flex-col items-center gap-3 p-2">
+                    <span className="text-center">Deseja receber notificações para este lembrete?</span>
+                    <div className="flex gap-4">
+                      <button
+                        className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-md shadow-sm hover:bg-slate-200"
+                        onClick={() => toast.dismiss(t.id)}
+                      >
+                        Agora não
+                      </button>
+                      <button
+                        className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md shadow-sm hover:bg-primary-700"
+                        onClick={async () => {
+                          await requestNotifications();
+                          toast.dismiss(t.id);
+                        }}
+                      >
+                        Sim, ativar
+                      </button>
+                    </div>
+                  </div>
+                ),
+                {
+                  duration: 10000, // Keep the toast longer
+                }
+              );
+        }
       }
       setView({ page: Page.List });
     } catch (error) {

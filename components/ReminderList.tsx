@@ -8,9 +8,10 @@ interface ReminderListProps {
   onToggleStatus: (id: number) => void;
   onDelete: (id: number) => void;
   onEdit: (id: number) => void;
+  onViewImage: (url: string) => void;
 }
 
-const ReminderList: React.FC<ReminderListProps> = ({ reminders, onToggleStatus, onDelete, onEdit }) => {
+const ReminderList: React.FC<ReminderListProps> = ({ reminders, onToggleStatus, onDelete, onEdit, onViewImage }) => {
   return (
     <div className="space-y-3">
       {reminders.map(reminder => (
@@ -21,6 +22,7 @@ const ReminderList: React.FC<ReminderListProps> = ({ reminders, onToggleStatus, 
           onToggleStatus={() => onToggleStatus(reminder.id!)}
           onDelete={() => onDelete(reminder.id!)}
           onEdit={() => onEdit(reminder.id!)}
+          onViewImage={onViewImage}
         />
         : null
       ))}

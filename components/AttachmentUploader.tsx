@@ -1,8 +1,7 @@
-
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import type { Attachment } from '../types';
 import { calculateFileHash } from '../services/fileService';
-import { Paperclip, X, FileText, Image as ImageIcon } from 'lucide-react';
+import { Paperclip, X, FileText, Image as ImageIcon, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface AttachmentUploaderProps {
@@ -13,28 +12,46 @@ interface AttachmentUploaderProps {
 const MAX_FILES = 5;
 const MAX_SIZE_MB = 10;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+const MAX_TOTAL_SIZE_MB = 25;
+const MAX_TOTAL_SIZE_BYTES = MAX_TOTAL_SIZE_MB * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
 
 const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({ attachments, setAttachments }) => {
   const [isDragging, setIsDragging] = useState(false);
   
+  const currentStats = useMemo(() => {
+    const count = attachments.length;
+    const totalSize = attachments.reduce((sum, att) => sum + att.size, 0);
+    return { count, totalSize };
+  }, [attachments]);
+  
   const handleFileProcessing = useCallback(async (files: FileList) => {
     const newAttachments: Attachment[] = [];
+    let runningSize = currentStats.totalSize;
+    let runningCount = currentStats.count;
+    const validationErrors: string[] = [];
     
     for (const file of Array.from(files)) {
-      if (attachments.length + newAttachments.length >= MAX_FILES) {
-        toast.error(`Você pode anexar no máximo ${MAX_FILES} arquivos.`);
+      if (runningCount >= MAX_FILES) {
+        validationErrors.push(`Limite de ${MAX_FILES} arquivos atingido.`);
         break;
       }
       if (!ALLOWED_TYPES.includes(file.type)) {
-        toast.error(`Tipo de arquivo não suportado: ${file.name}`);
+        validationErrors.push(`"${file.name}": Tipo de arquivo não suportado.`);
         continue;
       }
       if (file.size > MAX_SIZE_BYTES) {
-        toast.error(`O arquivo ${file.name} excede o limite de ${MAX_SIZE_MB}MB.`);
+        validationErrors.push(`"${file.name}": Excede o limite de ${MAX_SIZE_MB}MB por arquivo.`);
         continue;
       }
+      if (runningSize + file.size > MAX_TOTAL_SIZE_BYTES) {
+        validationErrors.push(`"${file.name}": Excederia o limite total de ${MAX_TOTAL_SIZE_MB}MB.`);
+        break;
+      }
 
+      runningSize += file.size;
+      runningCount += 1;
+      
       const hash = await calculateFileHash(file);
       const newAttachment: Attachment = {
         id: crypto.randomUUID(),
@@ -48,13 +65,28 @@ const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({ attachments, se
       };
       newAttachments.push(newAttachment);
     }
+    
+    if (validationErrors.length > 0) {
+        const errorsToShow = validationErrors.slice(0, 3);
+        const remainingErrors = validationErrors.length - errorsToShow.length;
+        let errorMessage = errorsToShow.join('\n');
+        if (remainingErrors > 0) {
+            errorMessage += `\nE mais ${remainingErrors} erro(s).`;
+        }
+        toast.error(errorMessage, { duration: 5000 });
+    }
 
-    setAttachments(prev => [...prev, ...newAttachments]);
-  }, [attachments, setAttachments]);
+    if (newAttachments.length > 0) {
+      setAttachments(prev => [...prev, ...newAttachments]);
+      toast.success(`${newAttachments.length} arquivo(s) adicionado(s) com sucesso.`);
+    }
+
+  }, [currentStats, setAttachments]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       handleFileProcessing(e.target.files);
+      e.target.value = '';
     }
   };
 
@@ -75,47 +107,67 @@ const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({ attachments, se
     setAttachments(prev => prev.filter(att => att.id !== id));
   };
   
+  const hasReachedLimit = currentStats.count >= MAX_FILES || currentStats.totalSize >= MAX_TOTAL_SIZE_BYTES;
+  
   return (
     <div className="mt-2 space-y-3">
-        <label
-            htmlFor="file-upload"
-            onDragEnter={() => setIsDragging(true)}
-            onDragLeave={() => setIsDragging(false)}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={handleDrop}
-            className={`
-            flex justify-center items-center w-full px-6 pt-5 pb-6 border-2 border-dashed rounded-md cursor-pointer
-            ${isDragging ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500'}
-            `}
-        >
-        <div className="space-y-1 text-center">
-            <Paperclip className="mx-auto h-8 w-8 text-slate-400" />
-            <div className="flex text-sm text-slate-600 dark:text-slate-400">
-            <p>Arraste e solte ou <span className="text-primary-600 dark:text-primary-400 font-semibold">procure arquivos</span></p>
-            <input id="file-upload" name="file-upload" type="file" className="sr-only" multiple onChange={handleFileChange} />
+        {hasReachedLimit && (
+            <div className="flex items-center gap-2 p-3 text-sm text-yellow-800 bg-yellow-100 dark:text-yellow-200 dark:bg-yellow-900/40 rounded-md">
+                <AlertTriangle size={18} />
+                <span>Você atingiu o limite de arquivos ou de armazenamento.</span>
             </div>
-            <p className="text-xs text-slate-500">Imagens e PDF, até {MAX_SIZE_MB}MB cada.</p>
-        </div>
-        </label>
+        )}
+        
+        {!hasReachedLimit && (
+            <label
+                htmlFor="file-upload"
+                onDragEnter={() => setIsDragging(true)}
+                onDragLeave={() => setIsDragging(false)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleDrop}
+                className={`
+                flex flex-col justify-center items-center w-full px-6 pt-5 pb-6 border-2 border-dashed rounded-md cursor-pointer
+                ${isDragging ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500'}
+                `}
+            >
+                <div className="space-y-1 text-center">
+                    <Paperclip className="mx-auto h-8 w-8 text-slate-400" />
+                    <div className="flex text-sm text-slate-600 dark:text-slate-400">
+                    <p>Arraste e solte ou <span className="text-primary-600 dark:text-primary-400 font-semibold">procure arquivos</span></p>
+                    <input id="file-upload" name="file-upload" type="file" className="sr-only" multiple onChange={handleFileChange} />
+                    </div>
+                    <p className="text-xs text-slate-500">Imagens e PDF, até {MAX_SIZE_MB}MB cada.</p>
+                </div>
+            </label>
+        )}
+      
+      <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+        <span>
+            Arquivos: {currentStats.count} / {MAX_FILES}
+        </span>
+        <span>
+            Armazenamento: {(currentStats.totalSize / 1024 / 1024).toFixed(1)} / {MAX_TOTAL_SIZE_MB} MB
+        </span>
+      </div>
       
       {attachments.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700">
           {attachments.map(att => (
             <div key={att.id} className="flex items-center justify-between p-2 bg-slate-100 dark:bg-slate-700 rounded-md">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 overflow-hidden">
                 {att.type.startsWith('image/') ? (
-                  <img src={att.localUrl} alt={att.name} className="w-10 h-10 object-cover rounded" />
+                  <img src={att.localUrl} alt={att.name} className="w-10 h-10 object-cover rounded flex-shrink-0" />
                 ) : (
-                  <div className="w-10 h-10 flex items-center justify-center bg-slate-200 dark:bg-slate-600 rounded">
+                  <div className="w-10 h-10 flex items-center justify-center bg-slate-200 dark:bg-slate-600 rounded flex-shrink-0">
                     <FileText className="text-slate-500" size={20} />
                   </div>
                 )}
-                <div className="text-sm">
-                  <p className="font-medium truncate max-w-[200px]">{att.name}</p>
+                <div className="text-sm overflow-hidden">
+                  <p className="font-medium truncate">{att.name}</p>
                   <p className="text-xs text-slate-500">{(att.size / 1024 / 1024).toFixed(2)} MB</p>
                 </div>
               </div>
-              <button onClick={() => handleRemoveAttachment(att.id)} className="p-1 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600">
+              <button onClick={() => handleRemoveAttachment(att.id)} className="p-1 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600 flex-shrink-0">
                 <X size={16} />
               </button>
             </div>
