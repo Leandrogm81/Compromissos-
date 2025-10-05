@@ -1,0 +1,7 @@
+{
+  "name": "Agenda PWA Offline-First",
+  "description": "Um aplicativo de agenda e lembretes com foco em funcionamento offline, notificações e entrada por voz. Construído com React, IndexedDB e Service Workers para uma experiência PWA robusta.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
