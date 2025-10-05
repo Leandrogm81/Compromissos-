@@ -72,25 +72,22 @@ const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, o
 
   useEffect(() => {
     const newImageUrls: Record<string, string> = {};
-    const urlsToRevoke: string[] = [];
 
     imageAttachments.forEach(att => {
-        // If there's a blob, it means the data is persisted. Create a URL for it.
-        // This is the key fix for images disappearing on reload.
-        if (att.blob && !att.localUrl) {
-            const url = URL.createObjectURL(att.blob);
-            newImageUrls[att.id] = url;
-            urlsToRevoke.push(url);
-        }
+      // FIX: Always create a new object URL from the blob data when the component is rendered.
+      // This ensures the URL is valid for the current browser session.
+      if (att.blob) {
+        const url = URL.createObjectURL(att.blob);
+        newImageUrls[att.id] = url;
+      }
     });
 
-    if (urlsToRevoke.length > 0) {
-        setImageUrls(prev => ({...prev, ...newImageUrls}));
-    }
+    setImageUrls(newImageUrls);
 
-    // Cleanup function to revoke the created object URLs to prevent memory leaks.
+    // Cleanup function to revoke the created object URLs when the component unmounts or
+    // the attachments change, preventing memory leaks.
     return () => {
-        urlsToRevoke.forEach(url => URL.revokeObjectURL(url));
+      Object.values(newImageUrls).forEach(url => URL.revokeObjectURL(url));
     };
   }, [imageAttachments]);
   
@@ -196,9 +193,8 @@ const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, o
            {imageAttachments.length > 0 && (
             <div className="mt-3 flex gap-2 flex-wrap">
               {imageAttachments.map(att => {
-                // Prioritize the original localUrl if it exists (for new uploads),
-                // otherwise use the dynamically created URL from the blob.
-                const imageUrl = att.localUrl || imageUrls[att.id];
+                // FIX: Use the URL from the component's state, which is guaranteed to be valid for this session.
+                const imageUrl = imageUrls[att.id];
                 if (!imageUrl) return null;
                 
                 return (

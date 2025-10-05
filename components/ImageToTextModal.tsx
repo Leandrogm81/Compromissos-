@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { UploadCloud, Loader2, ImagePlus, Save, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { UploadCloud, Loader2, ImagePlus, Save, Trash2, ClipboardPaste } from 'lucide-react';
 import { getReminderFromImage } from '../services/aiService';
 import toast from 'react-hot-toast';
 import type { Reminder, Attachment } from '../types';
 import { useImageAiRules } from '../hooks/useImageAiRules';
 import { calculateFileHash } from '../services/fileService';
 import Modal from './Modal';
+import { useClipboardPaste } from '../hooks/useClipboardPaste';
 
 interface ImageToTextModalProps {
   isOpen: boolean;
@@ -33,18 +34,24 @@ const ImageToTextModal: React.FC<ImageToTextModalProps> = ({ isOpen, onClose, on
   const [newRuleName, setNewRuleName] = useState('');
 
   const { rules, addRule, deleteRule } = useImageAiRules();
+  
+  const resetState = useCallback(() => {
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+    }
+    setImagePreview(null);
+    setSelectedFile(null);
+    setInstructions('');
+    setSelectedRuleId('');
+    setIsLoading(false);
+    setIsDragging(false);
+  }, [imagePreview]);
 
   useEffect(() => {
     if (!isOpen) {
-        // Reset state when modal is closed to ensure it's fresh next time
-        setImagePreview(null);
-        setSelectedFile(null);
-        setInstructions('');
-        setSelectedRuleId('');
-        setIsLoading(false);
-        setIsDragging(false);
+      resetState();
     }
-  }, [isOpen]);
+  }, [isOpen, resetState]);
 
   useEffect(() => {
     if (selectedRuleId && rules) {
@@ -56,16 +63,31 @@ const ImageToTextModal: React.FC<ImageToTextModalProps> = ({ isOpen, onClose, on
         setInstructions('');
     }
   }, [selectedRuleId, rules]);
+  
+  const processNewFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Por favor, selecione um arquivo de imagem.');
+      return;
+    }
+    // Clean up previous image URL to prevent memory leaks
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+    }
+    setSelectedFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+  
+  const handlePastedFiles = useCallback((files: File[]) => {
+    if (files.length > 0) {
+        processNewFile(files[0]);
+    }
+  }, [imagePreview]); // Dependency needed to correctly revoke old URL
+
+  const { pasteFromClipboard, isReading: isPasting } = useClipboardPaste(handlePastedFiles);
 
   const handleFileChange = (files: FileList | null) => {
     if (files && files[0]) {
-      const file = files[0];
-      if (!file.type.startsWith('image/')) {
-        toast.error('Por favor, selecione um arquivo de imagem.');
-        return;
-      }
-      setSelectedFile(file);
-      setImagePreview(URL.createObjectURL(file));
+      processNewFile(files[0]);
     }
   };
   
@@ -276,23 +298,34 @@ const ImageToTextModal: React.FC<ImageToTextModalProps> = ({ isOpen, onClose, on
           </div>
         </div>
       ) : (
-        <label
-          htmlFor="image-upload"
-          onDragEnter={() => setIsDragging(true)}
-          onDragLeave={() => setIsDragging(false)}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleDrop}
-          className={`flex flex-col justify-center items-center w-full h-48 px-6 pt-5 pb-6 border-2 border-dashed rounded-md cursor-pointer transition-colors ${isDragging ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500'}`}
-        >
-          <div className="space-y-1 text-center">
-            <UploadCloud className="mx-auto h-12 w-12 text-slate-400" />
-            <div className="flex text-sm text-slate-600 dark:text-slate-400">
-              <p>Arraste e solte ou <span className="font-semibold text-primary-600 dark:text-primary-400">procure uma imagem</span></p>
-              <input id="image-upload" name="image-upload" type="file" accept="image/*" className="sr-only" onChange={(e) => handleFileChange(e.target.files)} />
+        <div className="space-y-3">
+            <label
+            htmlFor="image-upload"
+            onDragEnter={() => setIsDragging(true)}
+            onDragLeave={() => setIsDragging(false)}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+            className={`flex flex-col justify-center items-center w-full h-48 px-6 pt-5 pb-6 border-2 border-dashed rounded-md cursor-pointer transition-colors ${isDragging ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500'}`}
+            >
+            <div className="space-y-1 text-center">
+                <UploadCloud className="mx-auto h-12 w-12 text-slate-400" />
+                <div className="flex text-sm text-slate-600 dark:text-slate-400">
+                <p>Arraste e solte ou <span className="font-semibold text-primary-600 dark:text-primary-400">procure uma imagem</span></p>
+                <input id="image-upload" name="image-upload" type="file" accept="image/*" className="sr-only" onChange={(e) => handleFileChange(e.target.files)} />
+                </div>
+                <p className="text-xs text-slate-500">PNG, JPG, GIF, etc.</p>
             </div>
-            <p className="text-xs text-slate-500">PNG, JPG, GIF, etc.</p>
-          </div>
-        </label>
+            </label>
+            <button
+                type="button"
+                onClick={pasteFromClipboard}
+                disabled={isPasting}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 disabled:opacity-50"
+            >
+                {isPasting ? <Loader2 size={16} className="animate-spin" /> : <ClipboardPaste size={16} />}
+                {isPasting ? 'Lendo...' : 'Colar Imagem da Área de Transferência'}
+            </button>
+        </div>
       )}
     </Modal>
   );
