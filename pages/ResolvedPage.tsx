@@ -19,6 +19,10 @@ const ResolvedPage: React.FC<ResolvedPageProps> = ({ onViewImage }) => {
     return reminders.filter(r => r.status === ReminderStatus.Done || r.status === ReminderStatus.Cancelled)
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   }, [reminders]);
+  
+  const handleViewReminder = (id: number) => {
+    setView({ page: Page.View, reminderId: id.toString() });
+  };
 
   return (
     <Layout title="Arquivados" showBackButton={true}>
@@ -29,6 +33,7 @@ const ResolvedPage: React.FC<ResolvedPageProps> = ({ onViewImage }) => {
             onToggleStatus={toggleReminderStatus}
             onDelete={deleteReminder}
             onEdit={(id) => setView({ page: Page.Form, reminderId: id.toString() })} // Editing is disabled in ReminderItem, but prop is needed
+            onView={handleViewReminder}
             onViewImage={onViewImage}
             onUpdateSubtaskStatus={(reminderId, subtaskId, done) => {}}
             onExport={() => {}} // Export is not applicable for resolved items

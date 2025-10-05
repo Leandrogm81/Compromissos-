@@ -6,6 +6,7 @@ import ListPage from './pages/ListPage';
 import FormPage from './pages/FormPage';
 import SettingsPage from './pages/SettingsPage';
 import ResolvedPage from './pages/ResolvedPage';
+import ViewPage from './pages/ViewPage';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './services/db';
 import { scheduleNotificationsForReminder } from './services/notificationService';
@@ -83,6 +84,8 @@ const App: React.FC = () => {
         return <SettingsPage />;
       case Page.Resolved:
         return <ResolvedPage onViewImage={setViewingImage} />;
+      case Page.View:
+        return <ViewPage reminderId={view.reminderId} onViewImage={setViewingImage} />;
       default:
         return <ListPage onViewImage={setViewingImage} setIsAiCreatorOpen={setIsAiCreatorOpen} setIsImageToTextModalOpen={setIsImageToTextModalOpen} setIsKeepImporterOpen={setIsKeepImporterOpen} />;
     }

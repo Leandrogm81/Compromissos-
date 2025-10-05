@@ -87,6 +87,10 @@ const ListPage: React.FC<ListPageProps> = ({ onViewImage, setIsAiCreatorOpen, se
   const handleEditReminder = (id: number) => {
     setView({ page: Page.Form, reminderId: id.toString() });
   };
+  
+  const handleViewReminder = (id: number) => {
+    setView({ page: Page.View, reminderId: id.toString() });
+  };
 
   const handleSummary = async () => {
     const todayReminders = groupedReminders['Hoje'] || [];
@@ -226,6 +230,7 @@ const ListPage: React.FC<ListPageProps> = ({ onViewImage, setIsAiCreatorOpen, se
                         onToggleStatus={toggleReminderStatus}
                         onDelete={deleteReminder}
                         onEdit={handleEditReminder}
+                        onView={handleViewReminder}
                         onViewImage={onViewImage}
                         onUpdateSubtaskStatus={updateSubtaskStatus}
                         onExport={handleExportToGoogleCalendar}

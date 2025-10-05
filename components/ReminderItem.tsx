@@ -10,6 +10,7 @@ interface ReminderItemProps {
   onToggleStatus: () => void;
   onDelete: () => void;
   onEdit: () => void;
+  onView: () => void;
   onViewImage: (url: string) => void;
   onUpdateSubtaskStatus: (subtaskId: string, done: boolean) => void;
   onExport: () => void;
@@ -51,7 +52,7 @@ const getProximityClass = (datetime: string, isDone: boolean): string => {
 };
 
 
-const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, onDelete, onEdit, onViewImage, onUpdateSubtaskStatus, onExport }) => {
+const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, onDelete, onEdit, onView, onViewImage, onUpdateSubtaskStatus, onExport }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const isDone = reminder.status === ReminderStatus.Done;
   
@@ -131,13 +132,15 @@ const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, o
         : 'bg-white dark:bg-slate-800'}
     `}>
       <div className="flex items-start gap-4">
-        <button onClick={onToggleStatus} aria-label={isDone ? "Marcar como pendente" : "Marcar como concluído"}>
-            {isDone 
-                ? <CheckCircle2 className="text-green-500 mt-1" size={20} /> 
-                : <Circle className="text-slate-400 dark:text-slate-500 mt-1" size={20}/>
-            }
-        </button>
-        <div className="flex-1 min-w-0">
+        <div className="flex-shrink-0 pt-0.5">
+            <button onClick={onToggleStatus} aria-label={isDone ? "Marcar como pendente" : "Marcar como concluído"}>
+                {isDone 
+                    ? <CheckCircle2 className="text-green-500" size={20} /> 
+                    : <Circle className="text-slate-400 dark:text-slate-500" size={20}/>
+                }
+            </button>
+        </div>
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={onView}>
           <div className="flex items-center gap-2">
             {renderIcon(reminder.icon)}
             <p className={`font-semibold ${isDone ? 'line-through text-slate-500' : 'text-slate-800 dark:text-slate-100'}`}>
@@ -156,7 +159,7 @@ const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, o
                </p>
                {isLongDescription && (
                  <button
-                   onClick={() => setIsExpanded(!isExpanded)}
+                   onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
                    className="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline mt-1 flex items-center gap-1"
                  >
                    {isExpanded ? 'Ver menos' : 'Ver mais'}
@@ -176,7 +179,7 @@ const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, o
                     {reminder.subtasks.map(subtask => (
                         <div key={subtask.id} className="flex items-center gap-3">
                             <button
-                                onClick={() => onUpdateSubtaskStatus(subtask.id, !subtask.done)}
+                                onClick={(e) => { e.stopPropagation(); onUpdateSubtaskStatus(subtask.id, !subtask.done); }}
                                 className="flex-shrink-0"
                                 aria-label={subtask.done ? 'Marcar subtarefa como pendente' : 'Marcar subtarefa como concluída'}
                             >
@@ -196,7 +199,6 @@ const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, o
            {imageAttachments.length > 0 && (
             <div className="mt-3 flex gap-2 flex-wrap">
               {imageAttachments.map(att => {
-                // FIX: Use the URL from the component's state, which is guaranteed to be valid for this session.
                 const imageUrl = imageUrls[att.id];
                 if (!imageUrl) return null;
                 
@@ -206,14 +208,14 @@ const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, o
                     src={imageUrl}
                     alt={att.name}
                     className="h-16 w-16 rounded-md object-cover cursor-pointer transition-transform hover:scale-105"
-                    onClick={() => onViewImage(imageUrl)}
+                    onClick={(e) => { e.stopPropagation(); onViewImage(imageUrl); }}
                     />
                 );
               })}
             </div>
            )}
         </div>
-        <div className="flex gap-1">
+        <div className="flex flex-col gap-1 flex-shrink-0 -mr-2">
           {!isDone && (
             <>
               <button onClick={onExport} className="p-2 text-slate-500 hover:text-blue-600 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Exportar para Google Calendar">

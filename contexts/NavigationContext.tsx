@@ -6,13 +6,15 @@ export enum Page {
   Form,
   Settings,
   Resolved,
+  View,
 }
 
 export type AppView =
   | { page: Page.List }
   | { page: Page.Form, reminderId?: string, initialData?: Partial<Reminder> }
   | { page: Page.Settings }
-  | { page: Page.Resolved };
+  | { page: Page.Resolved }
+  | { page: Page.View, reminderId: string };
 
 interface NavigationContextType {
   view: AppView;
