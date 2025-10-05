@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type } from '@google/genai';
+import type { Reminder } from '../types';
 
 interface AiSuggestion {
     title: string;
@@ -106,5 +107,44 @@ export async function processVoiceTranscript(transcript: string): Promise<string
     console.error("Error calling Gemini API for voice processing:", error);
     // Fallback to the original transcript on error
     return transcript;
+  }
+}
+
+export async function summarizeReminders(reminders: Reminder[]): Promise<string> {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error('API key for Gemini not found.');
+  }
+
+  if (reminders.length === 0) {
+    return "Você não tem nenhuma tarefa para hoje! Aproveite o dia para relaxar ou planejar algo novo.";
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  const reminderTitles = reminders.map(r => `- ${r.title}`).join('\n');
+
+  const prompt = `
+    Aja como um assistente pessoal amigável e motivacional.
+    Abaixo estão as tarefas do usuário para hoje. Crie um resumo curto, encorajador e útil para o dia dele.
+    Organize o pensamento, mas não seja robótico. Use uma linguagem natural.
+    Se houver poucas tarefas, seja breve. Se houver muitas, ajude a priorizar ou agrupar mentalmente.
+
+    Tarefas de hoje:
+    ${reminderTitles}
+
+    Seu resumo:
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+    });
+
+    return response.text.trim();
+  } catch (error) {
+    console.error("Error calling Gemini API for summary:", error);
+    throw new Error("Não foi possível obter o resumo do dia.");
   }
 }

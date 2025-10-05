@@ -9,9 +9,10 @@ interface ReminderListProps {
   onDelete: (id: number) => void;
   onEdit: (id: number) => void;
   onViewImage: (url: string) => void;
+  onUpdateSubtaskStatus: (reminderId: number, subtaskId: string, done: boolean) => void;
 }
 
-const ReminderList: React.FC<ReminderListProps> = ({ reminders, onToggleStatus, onDelete, onEdit, onViewImage }) => {
+const ReminderList: React.FC<ReminderListProps> = ({ reminders, onToggleStatus, onDelete, onEdit, onViewImage, onUpdateSubtaskStatus }) => {
   return (
     <div className="space-y-3">
       {reminders.map(reminder => (
@@ -23,6 +24,7 @@ const ReminderList: React.FC<ReminderListProps> = ({ reminders, onToggleStatus, 
           onDelete={() => onDelete(reminder.id!)}
           onEdit={() => onEdit(reminder.id!)}
           onViewImage={onViewImage}
+          onUpdateSubtaskStatus={(subtaskId, done) => onUpdateSubtaskStatus(reminder.id!, subtaskId, done)}
         />
         : null
       ))}

@@ -50,21 +50,28 @@
 
     <!-- Service Worker Registration -->
     <script>
+      const registerServiceWorker = () => {
+        // In sandboxed environments, relative paths can be resolved incorrectly.
+        // To fix this definitively, we construct an absolute URL using the
+        // page's actual origin, ensuring the script is loaded correctly.
+        const swUrl = `${window.location.origin}/sw.js`;
+        
+        navigator.serviceWorker.register(swUrl)
+          .then(registration => {
+            console.log('Service Worker registered successfully:', registration);
+          })
+          .catch(error => {
+            console.error('Service Worker registration failed:', error);
+          });
+      };
+      
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          // In sandboxed environments, relative paths can be resolved incorrectly.
-          // To fix this definitively, we construct an absolute URL using the
-          // page's actual origin, ensuring the script is loaded correctly.
-          const swUrl = `${window.location.origin}/sw.js`;
-          
-          navigator.serviceWorker.register(swUrl)
-            .then(registration => {
-              console.log('Service Worker registered successfully:', registration);
-            })
-            .catch(error => {
-              console.error('Service Worker registration failed:', error);
-            });
-        });
+        // Handle race condition where the script might load after the 'load' event.
+        if (document.readyState === 'complete') {
+            registerServiceWorker();
+        } else {
+            window.addEventListener('load', registerServiceWorker);
+        }
       }
     </script>
   </body>

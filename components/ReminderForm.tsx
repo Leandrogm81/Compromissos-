@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
-import type { Reminder, Attachment } from '../types';
+import type { Reminder, Attachment, Subtask } from '../types';
 import { Recurrence } from '../types';
 import VoiceInput from './VoiceInput';
 import AttachmentUploader from './AttachmentUploader';
 import { useAiAssist } from '../hooks/useAiAssist';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface ReminderFormProps {
@@ -48,6 +49,8 @@ const ReminderForm: React.FC<ReminderFormProps> = ({ onSubmit, initialData, onCa
 
   const [recurrence, setRecurrence] = useState<Recurrence>(initialData?.recurrence || Recurrence.None);
   const [attachments, setAttachments] = useState<Attachment[]>(initialData?.attachments || []);
+  const [subtasks, setSubtasks] = useState<Subtask[]>(initialData?.subtasks || []);
+  const [newSubtaskText, setNewSubtaskText] = useState('');
 
   const { isSuggesting, getSuggestions } = useAiAssist();
   
@@ -72,6 +75,24 @@ const ReminderForm: React.FC<ReminderFormProps> = ({ onSubmit, initialData, onCa
     }
   }
 
+  const handleAddSubtask = (e: React.KeyboardEvent<HTMLInputElement> | React.MouseEvent<HTMLButtonElement>) => {
+    if (e instanceof KeyboardEvent && e.key !== 'Enter') return;
+    e.preventDefault();
+    if (newSubtaskText.trim()) {
+      const newSubtask: Subtask = {
+        id: crypto.randomUUID(),
+        text: newSubtaskText.trim(),
+        done: false,
+      };
+      setSubtasks(prev => [...prev, newSubtask]);
+      setNewSubtaskText('');
+    }
+  };
+
+  const handleRemoveSubtask = (id: string) => {
+    setSubtasks(prev => prev.filter(st => st.id !== id));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -90,7 +111,7 @@ const ReminderForm: React.FC<ReminderFormProps> = ({ onSubmit, initialData, onCa
       }
       
       // Validation: Prevent scheduling reminders in the past.
-      if (utcDateTime.getTime() < new Date().getTime()) {
+      if (utcDateTime.getTime() < new Date().getTime() && !initialData) {
           toast.error('Não é possível agendar lembretes no passado.');
           return;
       }
@@ -102,6 +123,7 @@ const ReminderForm: React.FC<ReminderFormProps> = ({ onSubmit, initialData, onCa
         timezone: BRAZIL_TIME_ZONE,
         reminders: [5, 30], // Placeholder
         attachments,
+        subtasks,
         recurrence,
       });
     } catch (error) {
@@ -165,7 +187,7 @@ const ReminderForm: React.FC<ReminderFormProps> = ({ onSubmit, initialData, onCa
             id="datetime"
             value={dateTimeLocal}
             onChange={e => setDateTimeLocal(e.target.value)}
-            min={minDateTime}
+            min={!initialData ? minDateTime : undefined}
             className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-white dark:bg-slate-800 sm:text-sm"
             required
           />
@@ -186,6 +208,41 @@ const ReminderForm: React.FC<ReminderFormProps> = ({ onSubmit, initialData, onCa
             <option value={Recurrence.Weekly}>Semanalmente</option>
             <option value={Recurrence.Monthly}>Mensalmente</option>
           </select>
+      </div>
+
+      <div>
+        <label htmlFor="subtasks" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+          Checklist (Subtarefas)
+        </label>
+        <div className="mt-2 space-y-2">
+            {subtasks.map(subtask => (
+                <div key={subtask.id} className="flex items-center gap-2 p-2 bg-slate-100 dark:bg-slate-700 rounded-md">
+                    <span className="flex-grow text-sm">{subtask.text}</span>
+                    <button type="button" onClick={() => handleRemoveSubtask(subtask.id)} className="p-1 text-slate-500 hover:text-red-600 rounded-full" aria-label="Remover subtarefa">
+                        <Trash2 size={16} />
+                    </button>
+                </div>
+            ))}
+            <div className="flex items-center gap-2">
+                <input
+                    type="text"
+                    value={newSubtaskText}
+                    onChange={(e) => setNewSubtaskText(e.target.value)}
+                    onKeyDown={handleAddSubtask}
+                    placeholder="Adicionar subtarefa..."
+                    className="flex-grow block w-full rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-white dark:bg-slate-800 sm:text-sm"
+                />
+                <button
+                    type="button"
+                    onClick={handleAddSubtask}
+                    className="p-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+                    disabled={!newSubtaskText.trim()}
+                    aria-label="Adicionar subtarefa"
+                >
+                    <Plus size={20} />
+                </button>
+            </div>
+        </div>
       </div>
       
       <div>

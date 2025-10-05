@@ -1,4 +1,10 @@
 
+export type Subtask = {
+  id: string;
+  text: string;
+  done: boolean;
+};
+
 export type Attachment = {
   id: string; 
   name: string; 
@@ -31,6 +37,7 @@ export type Reminder = {
   timezone: string;     // IANA
   reminders: number[];  // minutos antes (ex.: [5, 30])
   attachments: Attachment[];
+  subtasks?: Subtask[];
   status: ReminderStatus;
   recurrence: Recurrence;
   createdAt: string;

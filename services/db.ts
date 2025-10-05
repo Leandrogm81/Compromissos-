@@ -23,6 +23,12 @@ export class AppDatabase extends Dexie {
     (this as Dexie).version(2).stores({
       reminders: '++id, title, datetime, status, createdAt, recurrence',
     });
+
+    // Version 3: No schema change for indexed fields, but acknowledges
+    // the addition of the non-indexed `subtasks` property on the Reminder object.
+    (this as Dexie).version(3).stores({
+      reminders: '++id, title, datetime, status, createdAt, recurrence',
+    });
   }
 }
 

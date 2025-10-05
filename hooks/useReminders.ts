@@ -1,6 +1,4 @@
 
-
-
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../services/db';
 import type { Reminder } from '../types';
@@ -46,6 +44,17 @@ export const useReminders = () => {
     cancelNotificationsForReminder(id); // Cancel notifications
     return db.reminders.delete(id);
   };
+
+  const updateSubtaskStatus = async (reminderId: number, subtaskId: string, done: boolean) => {
+    const reminder = await db.reminders.get(reminderId);
+    if (!reminder || !reminder.subtasks) return;
+
+    const updatedSubtasks = reminder.subtasks.map(subtask => 
+      subtask.id === subtaskId ? { ...subtask, done } : subtask
+    );
+
+    await updateReminder(reminderId, { subtasks: updatedSubtasks });
+  };
   
   const toggleReminderStatus = async (id: number) => {
     const reminder = await db.reminders.get(id);
@@ -88,6 +97,8 @@ export const useReminders = () => {
           status: ReminderStatus.Pending,
           // Retain the original recurrence rule
           recurrence: reminder.recurrence,
+          // Reset subtasks for the new recurring instance
+          subtasks: reminder.subtasks?.map(st => ({ ...st, done: false })),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
       };
@@ -102,5 +113,5 @@ export const useReminders = () => {
   };
 
 
-  return { reminders, addReminder, updateReminder, deleteReminder, getReminderById, toggleReminderStatus };
+  return { reminders, addReminder, updateReminder, deleteReminder, getReminderById, toggleReminderStatus, updateSubtaskStatus };
 };

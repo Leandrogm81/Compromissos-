@@ -3,7 +3,7 @@ import React from 'react';
 import type { Reminder } from '../types';
 import { ReminderStatus, Recurrence } from '../types';
 import { differenceInHours } from 'date-fns';
-import { Trash2, Edit, CheckCircle2, Circle, Repeat } from 'lucide-react';
+import { Trash2, Edit, CheckCircle2, Circle, Repeat, CheckSquare, Square } from 'lucide-react';
 
 interface ReminderItemProps {
   reminder: Reminder;
@@ -11,6 +11,7 @@ interface ReminderItemProps {
   onDelete: () => void;
   onEdit: () => void;
   onViewImage: (url: string) => void;
+  onUpdateSubtaskStatus: (subtaskId: string, done: boolean) => void;
 }
 
 const BRAZIL_TIME_ZONE = 'America/Sao_Paulo';
@@ -51,7 +52,7 @@ const getProximityClass = (datetime: string, isDone: boolean): string => {
 };
 
 
-const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, onDelete, onEdit, onViewImage }) => {
+const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, onDelete, onEdit, onViewImage, onUpdateSubtaskStatus }) => {
   const isDone = reminder.status === ReminderStatus.Done;
   
   const reminderDate = new Date(reminder.datetime);
@@ -101,6 +102,28 @@ const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, o
                 <span>{recurrenceTextMap[reminder.recurrence]}</span>
               </div>
            )}
+           {reminder.subtasks && reminder.subtasks.length > 0 && !isDone && (
+                <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 space-y-2">
+                    {reminder.subtasks.map(subtask => (
+                        <div key={subtask.id} className="flex items-center gap-3">
+                            <button
+                                onClick={() => onUpdateSubtaskStatus(subtask.id, !subtask.done)}
+                                className="flex-shrink-0"
+                                aria-label={subtask.done ? 'Marcar subtarefa como pendente' : 'Marcar subtarefa como concluída'}
+                            >
+                                {subtask.done ? (
+                                    <CheckSquare size={18} className="text-primary-600" />
+                                ) : (
+                                    <Square size={18} className="text-slate-400" />
+                                )}
+                            </button>
+                            <span className={`text-sm flex-grow ${subtask.done ? 'line-through text-slate-500' : ''}`}>
+                                {subtask.text}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            )}
            {imageAttachments.length > 0 && (
             <div className="mt-3 flex gap-2 flex-wrap">
               {imageAttachments.map(att => (
