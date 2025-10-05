@@ -1,14 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, X, Sparkles, ImagePlus, FileUp } from 'lucide-react';
+import { Plus, X, Sparkles, ImagePlus } from 'lucide-react';
 
 interface SpeedDialFabProps {
   onAdd: () => void;
   onAiCreate: () => void;
   onImageCreate: () => void;
-  onKeepImport: () => void;
 }
 
-const SpeedDialFab: React.FC<SpeedDialFabProps> = ({ onAdd, onAiCreate, onImageCreate, onKeepImport }) => {
+const SpeedDialFab: React.FC<SpeedDialFabProps> = ({ onAdd, onAiCreate, onImageCreate }) => {
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -32,7 +31,6 @@ const SpeedDialFab: React.FC<SpeedDialFabProps> = ({ onAdd, onAiCreate, onImageC
   };
 
   const actions = [
-    { label: 'Importar do Google Keep', icon: <FileUp size={20} />, action: createActionHandler(onKeepImport), bg: 'bg-yellow-500 hover:bg-yellow-600', ring: 'focus:ring-yellow-500', padding: 'p-3' },
     { label: 'Criar lembrete a partir de uma imagem', icon: <ImagePlus size={20} />, action: createActionHandler(onImageCreate), bg: 'bg-blue-600 hover:bg-blue-700', ring: 'focus:ring-blue-500', padding: 'p-3' },
     { label: 'Criar lembrete com IA', icon: <Sparkles size={20} />, action: createActionHandler(onAiCreate), bg: 'bg-purple-600 hover:bg-purple-700', ring: 'focus:ring-purple-500', padding: 'p-3' },
     { label: 'Criar novo lembrete', icon: <Plus size={24} />, action: createActionHandler(onAdd), bg: 'bg-primary-600 hover:bg-primary-700', ring: 'focus:ring-primary-500', padding: 'p-4' },

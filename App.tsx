@@ -14,7 +14,6 @@ import { ReminderStatus } from './types';
 import ImageViewer from './components/ImageViewer';
 import AiCreatorModal from './components/AiCreatorModal';
 import ImageToTextModal from './components/ImageToTextModal';
-import KeepImporterModal from './components/KeepImporterModal';
 import { useNavigation, Page } from './contexts/NavigationContext';
 
 
@@ -30,7 +29,6 @@ const App: React.FC = () => {
   const [viewingImage, setViewingImage] = useState<string | null>(null);
   const [isAiCreatorOpen, setIsAiCreatorOpen] = useState(false);
   const [isImageToTextModalOpen, setIsImageToTextModalOpen] = useState(false);
-  const [isKeepImporterOpen, setIsKeepImporterOpen] = useState(false);
   
   const pendingReminders = useLiveQuery(() =>
       db.reminders.where('status').equals(ReminderStatus.Pending).toArray()
@@ -68,16 +66,11 @@ const App: React.FC = () => {
     setIsImageToTextModalOpen(false);
     setView({ page: Page.Form, initialData: data });
   };
-  
-  const handleKeepImport = (data: Partial<Reminder>) => {
-    setIsKeepImporterOpen(false);
-    setView({ page: Page.Form, initialData: data });
-  };
 
   const renderPage = () => {
     switch (view.page) {
       case Page.List:
-        return <ListPage onViewImage={setViewingImage} setIsAiCreatorOpen={setIsAiCreatorOpen} setIsImageToTextModalOpen={setIsImageToTextModalOpen} setIsKeepImporterOpen={setIsKeepImporterOpen} />;
+        return <ListPage onViewImage={setViewingImage} setIsAiCreatorOpen={setIsAiCreatorOpen} setIsImageToTextModalOpen={setIsImageToTextModalOpen} />;
       case Page.Form:
         return <FormPage reminderId={view.reminderId} initialData={view.initialData} />;
       case Page.Settings:
@@ -87,7 +80,7 @@ const App: React.FC = () => {
       case Page.View:
         return <ViewPage reminderId={view.reminderId} onViewImage={setViewingImage} />;
       default:
-        return <ListPage onViewImage={setViewingImage} setIsAiCreatorOpen={setIsAiCreatorOpen} setIsImageToTextModalOpen={setIsImageToTextModalOpen} setIsKeepImporterOpen={setIsKeepImporterOpen} />;
+        return <ListPage onViewImage={setViewingImage} setIsAiCreatorOpen={setIsAiCreatorOpen} setIsImageToTextModalOpen={setIsImageToTextModalOpen} />;
     }
   };
 
@@ -112,11 +105,6 @@ const App: React.FC = () => {
           isOpen={isImageToTextModalOpen}
           onClose={() => setIsImageToTextModalOpen(false)}
           onComplete={handleImageGeneratedReminder}
-        />
-        <KeepImporterModal
-            isOpen={isKeepImporterOpen}
-            onClose={() => setIsKeepImporterOpen(false)}
-            onComplete={handleKeepImport}
         />
       </div>
     </ThemeContext.Provider>

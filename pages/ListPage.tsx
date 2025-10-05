@@ -4,10 +4,9 @@ import { useReminders } from '../hooks/useReminders';
 import ReminderList from '../components/ReminderList';
 import CalendarView from '../components/CalendarView';
 import Layout from '../components/Layout';
-import { Search, List, Calendar, Sparkles, Loader2 } from 'lucide-react';
+import { Search, List, Calendar } from 'lucide-react';
 import { ReminderStatus } from '../types';
 import { isToday, isTomorrow, isThisWeek, parseISO } from 'date-fns';
-import { summarizeReminders } from '../services/aiService';
 import toast from 'react-hot-toast';
 import { useNavigation, Page } from '../contexts/NavigationContext';
 import SpeedDialFab from '../components/SpeedDialFab';
@@ -16,17 +15,15 @@ interface ListPageProps {
   onViewImage: (url: string) => void;
   setIsAiCreatorOpen: (isOpen: boolean) => void;
   setIsImageToTextModalOpen: (isOpen: boolean) => void;
-  setIsKeepImporterOpen: (isOpen: boolean) => void;
 }
 
 type ActiveView = 'list' | 'calendar';
 
-const ListPage: React.FC<ListPageProps> = ({ onViewImage, setIsAiCreatorOpen, setIsImageToTextModalOpen, setIsKeepImporterOpen }) => {
+const ListPage: React.FC<ListPageProps> = ({ onViewImage, setIsAiCreatorOpen, setIsImageToTextModalOpen }) => {
   const { setView } = useNavigation();
   const { reminders, toggleReminderStatus, deleteReminder, updateSubtaskStatus } = useReminders();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeView, setActiveView] = useState<ActiveView>('list');
-  const [isSummarizing, setIsSummarizing] = useState(false);
 
   const pendingReminders = useMemo(() => {
       if (!reminders) return [];
@@ -92,45 +89,6 @@ const ListPage: React.FC<ListPageProps> = ({ onViewImage, setIsAiCreatorOpen, se
     setView({ page: Page.View, reminderId: id.toString() });
   };
 
-  const handleSummary = async () => {
-    const todayReminders = groupedReminders['Hoje'] || [];
-    setIsSummarizing(true);
-    try {
-      const summary = await summarizeReminders(todayReminders);
-      toast.custom(
-        (t) => (
-          <div
-            className={`${
-              t.visible ? 'animate-enter' : 'animate-leave'
-            } max-w-md w-full bg-white dark:bg-slate-800 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5 p-4`}
-          >
-            <div className="w-0 flex-1">
-              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                ✨ Resumo do seu dia
-              </p>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">
-                {summary}
-              </p>
-            </div>
-            <div className="flex border-l border-gray-200 dark:border-slate-700 ml-4 pl-4">
-              <button
-                onClick={() => toast.dismiss(t.id)}
-                className="w-full border border-transparent rounded-none p-4 flex items-center justify-center text-sm font-medium text-primary-600 hover:text-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        ),
-        { duration: 30000 }
-      );
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Erro ao gerar resumo.");
-    } finally {
-      setIsSummarizing(false);
-    }
-  };
-
   const handleExportToGoogleCalendar = (reminderId: number) => {
     const reminder = reminders?.find(r => r.id === reminderId);
     if (!reminder) {
@@ -162,8 +120,6 @@ const ListPage: React.FC<ListPageProps> = ({ onViewImage, setIsAiCreatorOpen, se
     window.open(url, '_blank', 'noopener,noreferrer');
     toast.success('Abrindo no Google Calendar...');
   };
-
-  const hasTodayReminders = groupedReminders['Hoje'] && groupedReminders['Hoje'].length > 0;
 
   return (
     <Layout title="Meus Lembretes">
@@ -199,19 +155,6 @@ const ListPage: React.FC<ListPageProps> = ({ onViewImage, setIsAiCreatorOpen, se
             </div>
         </div>
 
-        {activeView === 'list' && (
-          <div className="flex justify-start">
-            <button
-              onClick={handleSummary}
-              disabled={isSummarizing || !hasTodayReminders}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-primary-700 dark:text-primary-300 bg-primary-100 dark:bg-primary-900/40 rounded-md hover:bg-primary-200 dark:hover:bg-primary-900/60 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSummarizing ? <Loader2 className="animate-spin" size={16}/> : <Sparkles size={16} />}
-              Resumo do Dia com IA
-            </button>
-          </div>
-        )}
-        
         {activeView === 'list' ? (
            <>
             {filteredReminders && filteredReminders.length > 0 ? (
@@ -257,7 +200,6 @@ const ListPage: React.FC<ListPageProps> = ({ onViewImage, setIsAiCreatorOpen, se
         onAdd={() => setView({ page: Page.Form })}
         onAiCreate={() => setIsAiCreatorOpen(true)}
         onImageCreate={() => setIsImageToTextModalOpen(true)}
-        onKeepImport={() => setIsKeepImporterOpen(true)}
       />
     </Layout>
   );
