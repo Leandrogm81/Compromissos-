@@ -1,16 +1,15 @@
-
 import React from 'react';
 import { ArrowLeft, Settings, Archive } from 'lucide-react';
-import type { AppView } from '../App';
-import { Page } from '../App';
+import { useNavigation, Page } from '../contexts/NavigationContext';
 
 interface HeaderProps {
   title: string;
-  setView: (view: AppView) => void;
   showBackButton?: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ title, setView, showBackButton }) => {
+const Header: React.FC<HeaderProps> = ({ title, showBackButton }) => {
+  const { setView } = useNavigation();
+
   return (
     <header className="sticky top-0 z-10 bg-gray-50/80 dark:bg-slate-900/80 backdrop-blur-md shadow-sm">
       <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between h-16">

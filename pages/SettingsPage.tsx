@@ -1,17 +1,13 @@
-
 import React from 'react';
-import type { AppView } from '../App';
 import Layout from '../components/Layout';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationOptIn from '../components/NotificationOptIn';
 
-interface SettingsPageProps {
-  setView: (view: AppView) => void;
-}
+interface SettingsPageProps {}
 
-const SettingsPage: React.FC<SettingsPageProps> = ({ setView }) => {
+const SettingsPage: React.FC<SettingsPageProps> = () => {
   return (
-    <Layout title="Configurações" setView={setView} showBackButton={true}>
+    <Layout title="Configurações" showBackButton={true}>
       <div className="p-4 space-y-6">
         <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow">
           <h2 className="text-lg font-semibold mb-3">Aparência</h2>

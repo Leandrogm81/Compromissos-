@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'agenda-pwa-cache-v1';
+const CACHE_NAME = 'agenda-pwa-cache-v2';
 const APP_SHELL_URLS = [
   '/',
   '/index.html',
@@ -16,6 +16,8 @@ self.addEventListener('install', event => {
       return cache.addAll(APP_SHELL_URLS);
     })
   );
+  // Force the waiting service worker to become the active service worker.
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
@@ -30,30 +32,34 @@ self.addEventListener('activate', event => {
           }
         })
       );
+    }).then(() => {
+      // Tell the active service worker to take control of the page immediately.
+      return self.clients.claim();
     })
   );
-  return self.clients.claim();
 });
 
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
   // Strategy 1: Cache-first for app shell assets.
-  // These were pre-cached during the 'install' event.
   if (APP_SHELL_URLS.includes(url.pathname)) {
     event.respondWith(caches.match(event.request));
     return;
   }
 
   // Strategy 2: Stale-while-revalidate for navigation requests.
-  // This serves the page from cache quickly and updates it in the background.
   if (event.request.mode === 'navigate') {
     event.respondWith(
       caches.open(CACHE_NAME).then(cache => {
         return cache.match(event.request).then(response => {
           const fetchPromise = fetch(event.request).then(networkResponse => {
-            cache.put(event.request, networkResponse.clone());
+            if(networkResponse && networkResponse.status === 200) {
+              cache.put(event.request, networkResponse.clone());
+            }
             return networkResponse;
+          }).catch(err => {
+            console.log('[SW] Fetch failed; returning cached response if available.', err);
           });
           return response || fetchPromise;
         });
@@ -61,8 +67,25 @@ self.addEventListener('fetch', event => {
     );
     return;
   }
-
-  // For other requests (like CDN scripts, API calls), just go to the network.
+  
+  // Strategy 3: Network first, then cache for other requests (like CDN scripts).
+  // This provides offline functionality for external assets.
+  event.respondWith(
+    fetch(event.request).then(networkResponse => {
+      if(networkResponse && networkResponse.status === 200) {
+        if (url.hostname.includes('aistudiocdn.com')) {
+          const cachePromise = caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, networkResponse.clone());
+          });
+          event.waitUntil(cachePromise);
+        }
+      }
+      return networkResponse;
+    }).catch(() => {
+        // Network failed, try to get it from the cache.
+        return caches.match(event.request);
+    })
+  );
 });
 
 // Listener for push notifications from a server.
@@ -105,20 +128,16 @@ self.addEventListener('notificationclick', event => {
   
   event.notification.close(); // Close the notification
 
-  // This looks for an open window with the same URL and focuses it.
-  // If no window is open, it opens a new one.
   event.waitUntil(
     clients.matchAll({
       type: 'window',
       includeUncontrolled: true
     }).then(clientList => {
-      // If a window is already open, focus it.
       for (const client of clientList) {
         if (client.url === urlToOpen && 'focus' in client) {
           return client.focus();
         }
       }
-      // Otherwise, open a new window.
       if (clients.openWindow) {
         return clients.openWindow(urlToOpen);
       }

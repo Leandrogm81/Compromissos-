@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useMemo } from 'react';
+import React, { useCallback, useState, useMemo, useEffect } from 'react';
 import type { Attachment } from '../types';
 import { calculateFileHash } from '../services/fileService';
 import { Paperclip, X, FileText, Image as ImageIcon, AlertTriangle } from 'lucide-react';
@@ -19,6 +19,19 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'
 const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({ attachments, setAttachments }) => {
   const [isDragging, setIsDragging] = useState(false);
   
+  useEffect(() => {
+    // Cleanup function to revoke Object URLs to prevent memory leaks.
+    return () => {
+        attachments.forEach(att => {
+            if (att.localUrl) {
+                URL.revokeObjectURL(att.localUrl);
+            }
+        });
+    };
+  // FIX: An empty dependency array ensures this effect runs only once on mount and unmount.
+  // The original file was corrupted here, so ensuring correctness.
+  }, []); // Run only on component unmount
+
   const currentStats = useMemo(() => {
     const count = attachments.length;
     const totalSize = attachments.reduce((sum, att) => sum + att.size, 0);
@@ -167,7 +180,7 @@ const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({ attachments, se
                   <p className="text-xs text-slate-500">{(att.size / 1024 / 1024).toFixed(2)} MB</p>
                 </div>
               </div>
-              <button onClick={() => handleRemoveAttachment(att.id)} className="p-1 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600 flex-shrink-0">
+              <button onClick={() => handleRemoveAttachment(att.id)} className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-slate-200 dark:hover:bg-slate-600 flex-shrink-0" aria-label="Remover anexo">
                 <X size={16} />
               </button>
             </div>

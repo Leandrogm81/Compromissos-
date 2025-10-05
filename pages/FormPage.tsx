@@ -1,7 +1,4 @@
-
 import React, { useEffect, useState } from 'react';
-import type { AppView } from '../App';
-import { Page } from '../App';
 import type { Reminder } from '../types';
 import { useReminders } from '../hooks/useReminders';
 import ReminderForm from '../components/ReminderForm';
@@ -9,18 +6,19 @@ import Layout from '../components/Layout';
 import { ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { usePushManager } from '../hooks/usePushManager';
+import { useNavigation, Page } from '../contexts/NavigationContext';
 
 interface FormPageProps {
-  setView: (view: AppView) => void;
   reminderId?: string;
   initialData?: Partial<Reminder>;
 }
 
-const FormPage: React.FC<FormPageProps> = ({ setView, reminderId, initialData: propInitialData }) => {
+const FormPage: React.FC<FormPageProps> = ({ reminderId, initialData: propInitialData }) => {
   const [initialData, setInitialData] = useState<Partial<Reminder> | undefined>(propInitialData);
   const [isLoading, setIsLoading] = useState(true);
   const { addReminder, updateReminder, getReminderById } = useReminders();
   const { permission, request: requestNotifications } = usePushManager();
+  const { setView } = useNavigation();
   
   const isEditing = !!reminderId;
 
@@ -96,7 +94,6 @@ const FormPage: React.FC<FormPageProps> = ({ setView, reminderId, initialData: p
   return (
     <Layout
       title={isEditing ? 'Editar Lembrete' : 'Novo Lembrete'}
-      setView={setView}
       showBackButton={true}
     >
         <div className="p-4">

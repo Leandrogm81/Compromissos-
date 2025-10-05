@@ -1,20 +1,41 @@
-
-import React, { useState, useCallback, useRef } from 'react';
-import { X, Clipboard, Image as ImageIcon, Trash2, ClipboardPaste } from 'lucide-react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { Clipboard, Image as ImageIcon, Trash2, ClipboardPaste } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Reminder, Attachment } from '../types';
 import { calculateFileHash } from '../services/fileService';
+import Modal from './Modal';
 
 interface KeepImporterModalProps {
+  isOpen: boolean;
   onClose: () => void;
   onComplete: (data: Partial<Reminder>) => void;
 }
 
-const KeepImporterModal: React.FC<KeepImporterModalProps> = ({ onClose, onComplete }) => {
+const KeepImporterModal: React.FC<KeepImporterModalProps> = ({ isOpen, onClose, onComplete }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Cleanup object URLs when attachments change or component unmounts
+    return () => {
+      attachments.forEach(att => {
+        if (att.localUrl) {
+          URL.revokeObjectURL(att.localUrl);
+        }
+      });
+    };
+  }, [attachments]);
+  
+  useEffect(() => {
+    if (!isOpen) {
+        // Reset state when modal is closed
+        setTitle('');
+        setDescription('');
+        setAttachments([]);
+    }
+  }, [isOpen]);
 
   const processFiles = useCallback(async (files: File[] | Blob[]) => {
     const newAttachments: Attachment[] = [];
@@ -28,7 +49,7 @@ const KeepImporterModal: React.FC<KeepImporterModalProps> = ({ onClose, onComple
         const extension = item.type.split('/')[1] || 'png';
         file = new File([item], `pasted_image.${extension}`, { type: item.type });
       } else {
-        continue; // Skip non-image blobs or other types
+        continue;
       }
 
       try {
@@ -58,13 +79,12 @@ const KeepImporterModal: React.FC<KeepImporterModalProps> = ({ onClose, onComple
 
   const readImagesFromClipboard = useCallback(async (): Promise<File[] | null> => {
     if (!navigator.clipboard || !navigator.clipboard.read) {
-      return null; // API not supported
+      return null;
     }
     try {
       const clipboardItems = await navigator.clipboard.read();
       const imageFiles: File[] = [];
       for (const item of clipboardItems) {
-        // FIX: Convert DOMStringList to array to use .find()
         const imageType = Array.from(item.types).find(type => type.startsWith('image/'));
         if (imageType) {
           const blob = await item.getType(imageType);
@@ -81,7 +101,7 @@ const KeepImporterModal: React.FC<KeepImporterModalProps> = ({ onClose, onComple
         console.error("Clipboard API error:", err);
         toast.error("Não foi possível ler da área de transferência.");
       }
-      return []; // Return empty array on error to prevent fallback
+      return [];
     }
   }, []);
 
@@ -98,16 +118,12 @@ const KeepImporterModal: React.FC<KeepImporterModalProps> = ({ onClose, onComple
 
   const handlePaste = useCallback(async (event: React.ClipboardEvent<HTMLDivElement>) => {
     const filesFromModernAPI = await readImagesFromClipboard();
-
     if (filesFromModernAPI && filesFromModernAPI.length > 0) {
       event.preventDefault();
       await processFiles(filesFromModernAPI);
       return;
     }
-    
-    // Fallback if modern API is not supported (null) or finds nothing
     if (filesFromModernAPI?.length === 0) return;
-
     const filesFromFallback: File[] = [];
     if (event.clipboardData) {
       const items = event.clipboardData.items;
@@ -118,7 +134,6 @@ const KeepImporterModal: React.FC<KeepImporterModalProps> = ({ onClose, onComple
         }
       }
     }
-    
     if (filesFromFallback.length > 0) {
       event.preventDefault();
       await processFiles(filesFromFallback);
@@ -137,10 +152,6 @@ const KeepImporterModal: React.FC<KeepImporterModalProps> = ({ onClose, onComple
   };
 
   const handleRemoveAttachment = (id: string) => {
-    const attachmentToRemove = attachments.find(att => att.id === id);
-    if (attachmentToRemove && attachmentToRemove.localUrl) {
-      URL.revokeObjectURL(attachmentToRemove.localUrl);
-    }
     setAttachments(prev => prev.filter(att => att.id !== id));
   };
 
@@ -149,28 +160,44 @@ const KeepImporterModal: React.FC<KeepImporterModalProps> = ({ onClose, onComple
       toast.error("Por favor, adicione um título, descrição ou imagem para importar.");
       return;
     }
-
     const importedData: Partial<Reminder> = {
       title: title || 'Nota importada do Keep',
       description,
       attachments,
       datetime: new Date().toISOString(),
     };
-
     onComplete(importedData);
   };
+  
+  const modalFooter = (
+    <>
+      <button
+        type="button"
+        onClick={onClose}
+        className="px-4 py-2 text-sm font-medium text-slate-700 bg-white dark:bg-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm hover:bg-slate-50 dark:hover:bg-slate-600"
+      >
+        Cancelar
+      </button>
+      <button
+        type="button"
+        onClick={handleSubmit}
+        className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md shadow-sm hover:bg-primary-700 flex items-center gap-2"
+      >
+        Importar Lembrete
+      </button>
+    </>
+  );
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in" aria-modal="true" role="dialog">
-      <div className="relative bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl m-4 flex flex-col h-[85vh] transform transition-all animate-slide-up">
-        <div className="p-4 border-b dark:border-slate-700">
-          <h2 className="text-lg font-bold flex items-center gap-2">
-            <Clipboard className="text-primary-500" />
-            Importar do Google Keep
-          </h2>
-        </div>
-
-        <div className="p-6 flex-1 overflow-y-auto space-y-6" onPaste={handlePaste}>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Importar do Google Keep"
+      titleIcon={<Clipboard className="text-primary-500" />}
+      className="max-w-2xl h-[85vh]"
+      footer={modalFooter}
+    >
+        <div className="space-y-6 h-full" onPaste={handlePaste}>
           <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400 text-blue-800 dark:text-blue-200 rounded-lg">
             <p className="font-semibold">Como importar:</p>
             <ol className="list-decimal list-inside text-sm mt-1 space-y-1">
@@ -264,35 +291,7 @@ const KeepImporterModal: React.FC<KeepImporterModalProps> = ({ onClose, onComple
             )}
           </div>
         </div>
-
-        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t dark:border-slate-700 flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-slate-700 bg-white dark:bg-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm hover:bg-slate-50 dark:hover:bg-slate-600"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md shadow-sm hover:bg-primary-700 flex items-center gap-2"
-          >
-            Importar Lembrete
-          </button>
-        </div>
-
-        <button onClick={onClose} className="absolute top-3 right-3 p-1 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700" aria-label="Fechar">
-          <X size={20} />
-        </button>
-      </div>
-      <style>{`
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .animate-fade-in { animation: fadeIn 0.2s ease-out; }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .animate-slide-up { animation: slideUp 0.3s ease-out; }
-      `}</style>
-    </div>
+    </Modal>
   );
 };
 

@@ -1,20 +1,18 @@
 import React, { useState, useMemo } from 'react';
-// Fix: Import `Reminder` type from `../types` where it is defined, not from `../App`.
-import type { AppView } from '../App';
 import type { Reminder } from '../types';
-import { Page } from '../App';
 import { useReminders } from '../hooks/useReminders';
 import ReminderList from '../components/ReminderList';
 import CalendarView from '../components/CalendarView';
 import Layout from '../components/Layout';
-import { Plus, Search, List, Calendar, Sparkles, Loader2, ImagePlus, FileUp } from 'lucide-react';
+import { Search, List, Calendar, Sparkles, Loader2 } from 'lucide-react';
 import { ReminderStatus } from '../types';
 import { isToday, isTomorrow, isThisWeek, parseISO } from 'date-fns';
 import { summarizeReminders } from '../services/aiService';
 import toast from 'react-hot-toast';
+import { useNavigation, Page } from '../contexts/NavigationContext';
+import SpeedDialFab from '../components/SpeedDialFab';
 
 interface ListPageProps {
-  setView: (view: AppView) => void;
   onViewImage: (url: string) => void;
   setIsAiCreatorOpen: (isOpen: boolean) => void;
   setIsImageToTextModalOpen: (isOpen: boolean) => void;
@@ -23,7 +21,8 @@ interface ListPageProps {
 
 type ActiveView = 'list' | 'calendar';
 
-const ListPage: React.FC<ListPageProps> = ({ setView, onViewImage, setIsAiCreatorOpen, setIsImageToTextModalOpen, setIsKeepImporterOpen }) => {
+const ListPage: React.FC<ListPageProps> = ({ onViewImage, setIsAiCreatorOpen, setIsImageToTextModalOpen, setIsKeepImporterOpen }) => {
+  const { setView } = useNavigation();
   const { reminders, toggleReminderStatus, deleteReminder, updateSubtaskStatus } = useReminders();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeView, setActiveView] = useState<ActiveView>('list');
@@ -163,7 +162,7 @@ const ListPage: React.FC<ListPageProps> = ({ setView, onViewImage, setIsAiCreato
   const hasTodayReminders = groupedReminders['Hoje'] && groupedReminders['Hoje'].length > 0;
 
   return (
-    <Layout title="Meus Lembretes" setView={setView}>
+    <Layout title="Meus Lembretes">
       <div className="p-4 space-y-4">
         <div className="flex items-center gap-4">
             <div className="relative flex-grow">
@@ -196,7 +195,7 @@ const ListPage: React.FC<ListPageProps> = ({ setView, onViewImage, setIsAiCreato
             </div>
         </div>
 
-        {process.env.API_KEY && activeView === 'list' && (
+        {activeView === 'list' && (
           <div className="flex justify-start">
             <button
               onClick={handleSummary}
@@ -249,40 +248,12 @@ const ListPage: React.FC<ListPageProps> = ({ setView, onViewImage, setIsAiCreato
           />
         )}
       </div>
-      <div className="fixed bottom-6 right-6 flex flex-col items-center gap-3">
-        <button
-          onClick={() => setIsKeepImporterOpen(true)}
-          className="bg-yellow-500 hover:bg-yellow-600 text-white rounded-full p-3 shadow-lg transition-transform transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 dark:focus:ring-offset-slate-900"
-          aria-label="Importar do Google Keep"
-        >
-          <FileUp size={20} />
-        </button>
-        {process.env.API_KEY && (
-          <>
-            <button
-              onClick={() => setIsImageToTextModalOpen(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-3 shadow-lg transition-transform transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-slate-900"
-              aria-label="Criar lembrete a partir de uma imagem"
-            >
-              <ImagePlus size={20} />
-            </button>
-            <button
-              onClick={() => setIsAiCreatorOpen(true)}
-              className="bg-purple-600 hover:bg-purple-700 text-white rounded-full p-3 shadow-lg transition-transform transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 dark:focus:ring-offset-slate-900"
-              aria-label="Criar lembrete com IA"
-            >
-              <Sparkles size={20} />
-            </button>
-          </>
-        )}
-        <button
-          onClick={() => setView({ page: Page.Form })}
-          className="bg-primary-600 hover:bg-primary-700 text-white rounded-full p-4 shadow-lg transition-transform transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:focus:ring-offset-slate-900"
-          aria-label="Criar novo lembrete"
-        >
-          <Plus size={24} />
-        </button>
-      </div>
+      <SpeedDialFab 
+        onAdd={() => setView({ page: Page.Form })}
+        onAiCreate={() => setIsAiCreatorOpen(true)}
+        onImageCreate={() => setIsImageToTextModalOpen(true)}
+        onKeepImport={() => setIsKeepImporterOpen(true)}
+      />
     </Layout>
   );
 };

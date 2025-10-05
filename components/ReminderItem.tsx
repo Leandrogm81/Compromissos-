@@ -3,6 +3,7 @@ import type { Reminder } from '../types';
 import { ReminderStatus, Recurrence } from '../types';
 import { differenceInHours } from 'date-fns';
 import { Trash2, Edit, CheckCircle2, Circle, Repeat, CheckSquare, Square, Briefcase, Pill, Plane, ShoppingCart, GraduationCap, Gift, Dog, Heart, Calendar, Code, Dumbbell, Music, ChevronDown, ChevronUp, Share2 } from 'lucide-react';
+import { BRAZIL_TIME_ZONE } from '../constants';
 
 interface ReminderItemProps {
   reminder: Reminder;
@@ -13,8 +14,6 @@ interface ReminderItemProps {
   onUpdateSubtaskStatus: (subtaskId: string, done: boolean) => void;
   onExport: () => void;
 }
-
-const BRAZIL_TIME_ZONE = 'America/Sao_Paulo';
 
 // Define constants for proximity in hours
 const HOURS_IN_A_DAY = 24;

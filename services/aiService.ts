@@ -19,6 +19,7 @@ const responseSchema = {
 };
 
 export async function suggestReminderFields(text: string, currentTitle?: string): Promise<AiSuggestion> {
+  // FIX: Per coding guidelines, use process.env.API_KEY to access the Gemini API key.
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
     throw new Error('API key for Gemini not found.');
@@ -79,6 +80,7 @@ export async function getReminderFromImage(
   imageData: { mimeType: string, data: string },
   instructions?: string
 ): Promise<AiSuggestion> {
+  // FIX: Per coding guidelines, use process.env.API_KEY to access the Gemini API key.
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
     throw new Error('API key for Gemini not found.');
@@ -139,6 +141,7 @@ export async function getReminderFromImage(
 }
 
 export async function processVoiceTranscript(transcript: string): Promise<string> {
+  // FIX: Per coding guidelines, use process.env.API_KEY to access the Gemini API key.
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
     console.log("AI processing for voice disabled. API_KEY not provided.");
@@ -174,6 +177,7 @@ export async function processVoiceTranscript(transcript: string): Promise<string
 }
 
 export async function summarizeReminders(reminders: Reminder[]): Promise<string> {
+  // FIX: Per coding guidelines, use process.env.API_KEY to access the Gemini API key.
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
     throw new Error('API key for Gemini not found.');

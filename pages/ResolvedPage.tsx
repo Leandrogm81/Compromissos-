@@ -1,18 +1,17 @@
 import React, { useMemo } from 'react';
-import type { AppView } from '../App';
-import { Page } from '../App';
 import { useReminders } from '../hooks/useReminders';
 import ReminderList from '../components/ReminderList';
 import Layout from '../components/Layout';
 import { ReminderStatus } from '../types';
 import { Archive } from 'lucide-react';
+import { useNavigation, Page } from '../contexts/NavigationContext';
 
 interface ResolvedPageProps {
-  setView: (view: AppView) => void;
   onViewImage: (url: string) => void;
 }
 
-const ResolvedPage: React.FC<ResolvedPageProps> = ({ setView, onViewImage }) => {
+const ResolvedPage: React.FC<ResolvedPageProps> = ({ onViewImage }) => {
+  const { setView } = useNavigation();
   const { reminders, toggleReminderStatus, deleteReminder } = useReminders();
 
   const resolvedReminders = useMemo(() => {
@@ -22,7 +21,7 @@ const ResolvedPage: React.FC<ResolvedPageProps> = ({ setView, onViewImage }) => 
   }, [reminders]);
 
   return (
-    <Layout title="Arquivados" setView={setView} showBackButton={true}>
+    <Layout title="Arquivados" showBackButton={true}>
       <div className="p-4 space-y-4">
         {resolvedReminders && resolvedReminders.length > 0 ? (
           <ReminderList

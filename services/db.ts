@@ -1,22 +1,13 @@
 import Dexie, { type Table } from 'dexie';
 import type { Reminder, ImageAiRule } from '../types';
 
-// FIX: The `version()` method was not found on the extended Dexie class type when called within the constructor.
-// Moving the schema definition outside of the constructor and applying it to the created 'db' instance
-// resolves the TypeScript error by ensuring the method is called on a fully constructed instance.
-export class AppDatabase extends Dexie {
-  reminders!: Table<Reminder>;
-  imageAiRules!: Table<ImageAiRule>;
-
-  constructor() {
-    super('AgendaPWA_DB');
-  }
-}
-
-export const db = new AppDatabase();
-
-// Define schema versions on the database instance.
-// This approach ensures that `db` is a fully typed Dexie instance when `version()` is called.
+// FIX: Refactored to use a direct Dexie instance instead of subclassing.
+// This pattern is more direct and avoids potential 'this' context issues or
+// type inheritance problems that may have caused errors with the 'version' method.
+export const db = new Dexie('AgendaPWA_DB') as Dexie & {
+  reminders: Table<Reminder>;
+  imageAiRules: Table<ImageAiRule>;
+};
 
 // Version 1: Initial schema without the recurrence field.
 db.version(1).stores({

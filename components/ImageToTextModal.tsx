@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { X, UploadCloud, Loader2, ImagePlus, Save, Trash2 } from 'lucide-react';
+import { UploadCloud, Loader2, ImagePlus, Save, Trash2 } from 'lucide-react';
 import { getReminderFromImage } from '../services/aiService';
 import toast from 'react-hot-toast';
 import type { Reminder, Attachment } from '../types';
 import { useImageAiRules } from '../hooks/useImageAiRules';
 import { calculateFileHash } from '../services/fileService';
+import Modal from './Modal';
 
 interface ImageToTextModalProps {
+  isOpen: boolean;
   onClose: () => void;
   onComplete: (data: Partial<Reminder>) => void;
 }
@@ -20,7 +22,7 @@ const fileToBase64 = (file: File): Promise<string> =>
   });
 
 
-const ImageToTextModal: React.FC<ImageToTextModalProps> = ({ onClose, onComplete }) => {
+const ImageToTextModal: React.FC<ImageToTextModalProps> = ({ isOpen, onClose, onComplete }) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [instructions, setInstructions] = useState('');
@@ -33,13 +35,24 @@ const ImageToTextModal: React.FC<ImageToTextModalProps> = ({ onClose, onComplete
   const { rules, addRule, deleteRule } = useImageAiRules();
 
   useEffect(() => {
+    if (!isOpen) {
+        // Reset state when modal is closed to ensure it's fresh next time
+        setImagePreview(null);
+        setSelectedFile(null);
+        setInstructions('');
+        setSelectedRuleId('');
+        setIsLoading(false);
+        setIsDragging(false);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
     if (selectedRuleId && rules) {
       const selectedRule = rules.find(r => r.id === parseInt(selectedRuleId, 10));
       if (selectedRule) {
         setInstructions(selectedRule.instructions);
       }
     } else if (!selectedRuleId) {
-        // If user selects the "default" option, clear instructions
         setInstructions('');
     }
   }, [selectedRuleId, rules]);
@@ -65,11 +78,12 @@ const ImageToTextModal: React.FC<ImageToTextModalProps> = ({ onClose, onComplete
     }
   };
   
-  const resetState = () => {
+  const resetImage = () => {
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+    }
     setImagePreview(null);
     setSelectedFile(null);
-    setInstructions('');
-    setSelectedRuleId('');
   };
 
   const handleStartSaveRule = () => {
@@ -126,7 +140,7 @@ const ImageToTextModal: React.FC<ImageToTextModalProps> = ({ onClose, onComplete
         size: selectedFile.size,
         hash,
         blob: selectedFile,
-        localUrl: imagePreview!, // Reuse the generated object URL from preview
+        localUrl: imagePreview!,
         createdAt: new Date().toISOString(),
       };
       
@@ -139,162 +153,148 @@ const ImageToTextModal: React.FC<ImageToTextModalProps> = ({ onClose, onComplete
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in" aria-modal="true" role="dialog">
-      <div className="relative bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-lg m-4 flex flex-col transform transition-all animate-slide-up">
-        <div className="p-4 border-b dark:border-slate-700">
-          <h2 className="text-lg font-bold flex items-center gap-2">
-            <ImagePlus className="text-primary-500" />
-            Criar Lembrete por Imagem
-          </h2>
-        </div>
+  const modalFooter = (
+    <>
+      <button
+        type="button"
+        onClick={onClose}
+        className="px-4 py-2 text-sm font-medium text-slate-700 bg-white dark:bg-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm hover:bg-slate-50 dark:hover:bg-slate-600"
+      >
+        Cancelar
+      </button>
+      <button
+        type="button"
+        onClick={handleProcessImage}
+        disabled={!selectedFile || isLoading}
+        className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md shadow-sm hover:bg-primary-700 disabled:bg-primary-300 disabled:cursor-not-allowed flex items-center gap-2"
+      >
+        {isLoading ? <Loader2 className="animate-spin" size={18} /> : null}
+        {isLoading ? 'Analisando...' : 'Analisar e Criar'}
+      </button>
+    </>
+  );
 
-        <div className="p-6 flex-1 overflow-y-auto">
-          {imagePreview ? (
-            <div className="space-y-4">
-              <div className="relative">
-                <img src={imagePreview} alt="Pré-visualização" className="w-full h-auto max-h-64 object-contain rounded-md border dark:border-slate-700" />
-                <button
-                  onClick={resetState}
-                  className="absolute top-2 right-2 p-1.5 bg-black/60 text-white rounded-full hover:bg-black/80"
-                  aria-label="Remover imagem"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              <div>
-                <label htmlFor="instructions" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Regras ou contexto adicional (opcional)
-                </label>
-                
-                {rules && rules.length > 0 && !isSavingRule && (
-                    <div className="flex items-center gap-2 mb-2">
-                        <select
-                            id="rule-select"
-                            value={selectedRuleId}
-                            onChange={(e) => setSelectedRuleId(e.target.value)}
-                            className="flex-grow block w-full rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-white dark:bg-slate-700 sm:text-sm"
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Criar Lembrete por Imagem"
+      titleIcon={<ImagePlus className="text-primary-500" />}
+      footer={modalFooter}
+    >
+      {imagePreview ? (
+        <div className="space-y-4">
+          <div className="relative">
+            <img src={imagePreview} alt="Pré-visualização" className="w-full h-auto max-h-64 object-contain rounded-md border dark:border-slate-700" />
+            <button
+              onClick={resetImage}
+              className="absolute top-2 right-2 p-1.5 bg-black/60 text-white rounded-full hover:bg-black/80"
+              aria-label="Remover imagem"
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
+          <div>
+            <label htmlFor="instructions" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              Regras ou contexto adicional (opcional)
+            </label>
+            
+            {rules && rules.length > 0 && !isSavingRule && (
+                <div className="flex items-center gap-2 mb-2">
+                    <select
+                        id="rule-select"
+                        value={selectedRuleId}
+                        onChange={(e) => setSelectedRuleId(e.target.value)}
+                        className="flex-grow block w-full rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-white dark:bg-slate-700 sm:text-sm"
+                    >
+                        <option value="">Carregar regra salva...</option>
+                        {rules.map(rule => (
+                            <option key={rule.id} value={rule.id}>{rule.name}</option>
+                        ))}
+                    </select>
+                    <button 
+                        onClick={handleDeleteRule} 
+                        disabled={!selectedRuleId}
+                        className="p-2 text-slate-500 hover:text-red-500 disabled:text-slate-400 disabled:cursor-not-allowed rounded-md bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600"
+                        aria-label="Excluir regra selecionada"
+                    >
+                        <Trash2 size={18} />
+                    </button>
+                </div>
+            )}
+            
+            {isSavingRule ? (
+                <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-md border border-slate-200 dark:border-slate-600">
+                    <p className="text-sm font-medium">Salvando regra:</p>
+                    <p className="text-sm p-2 bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-600 whitespace-pre-wrap">{instructions}</p>
+                    <input
+                        type="text"
+                        value={newRuleName}
+                        onChange={(e) => setNewRuleName(e.target.value)}
+                        placeholder="Dê um nome para esta regra..."
+                        className="block w-full rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-white dark:bg-slate-800 sm:text-sm"
+                        autoFocus
+                    />
+                    <div className="flex justify-end gap-2">
+                        <button
+                            onClick={handleCancelSaveRule}
+                            className="px-3 py-1 text-sm font-medium text-slate-700 dark:text-slate-200 bg-transparent rounded-md hover:bg-slate-100 dark:hover:bg-slate-600"
                         >
-                            <option value="">Carregar regra salva...</option>
-                            {rules.map(rule => (
-                                <option key={rule.id} value={rule.id}>{rule.name}</option>
-                            ))}
-                        </select>
-                        <button 
-                            onClick={handleDeleteRule} 
-                            disabled={!selectedRuleId}
-                            className="p-2 text-slate-500 hover:text-red-500 disabled:text-slate-400 disabled:cursor-not-allowed rounded-md bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600"
-                            aria-label="Excluir regra selecionada"
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={handleConfirmSaveRule}
+                            className="px-3 py-1 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
                         >
-                            <Trash2 size={18} />
+                            Salvar Regra
                         </button>
                     </div>
-                )}
-                
-                {isSavingRule ? (
-                    <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-md border border-slate-200 dark:border-slate-600">
-                        <p className="text-sm font-medium">Salvando regra:</p>
-                        <p className="text-sm p-2 bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-600 whitespace-pre-wrap">{instructions}</p>
-                        <input
-                            type="text"
-                            value={newRuleName}
-                            onChange={(e) => setNewRuleName(e.target.value)}
-                            placeholder="Dê um nome para esta regra..."
-                            className="block w-full rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-white dark:bg-slate-800 sm:text-sm"
-                            autoFocus
-                        />
-                        <div className="flex justify-end gap-2">
-                            <button
-                                onClick={handleCancelSaveRule}
-                                className="px-3 py-1 text-sm font-medium text-slate-700 dark:text-slate-200 bg-transparent rounded-md hover:bg-slate-100 dark:hover:bg-slate-600"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleConfirmSaveRule}
-                                className="px-3 py-1 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
-                            >
-                                Salvar Regra
-                            </button>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="relative">
-                        <textarea
-                        id="instructions"
-                        value={instructions}
-                        onChange={(e) => {
-                            setInstructions(e.target.value);
-                            // If user types, deselect the rule to avoid confusion
-                            if (selectedRuleId) setSelectedRuleId('');
-                        }}
-                        rows={3}
-                        className="block w-full rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-white dark:bg-slate-800 sm:text-sm pr-10"
-                        placeholder="Ex: 'Ignorar o endereço', 'O evento é na próxima semana'"
-                        />
-                         <button
-                            onClick={handleStartSaveRule}
-                            disabled={!instructions.trim()}
-                            className="absolute top-2 right-2 p-1.5 text-slate-500 hover:text-primary-600 disabled:text-slate-400 disabled:cursor-not-allowed rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
-                            aria-label="Salvar instrução como uma nova regra"
-                         >
-                            <Save size={18} />
-                         </button>
-                    </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <label
-              htmlFor="image-upload"
-              onDragEnter={() => setIsDragging(true)}
-              onDragLeave={() => setIsDragging(false)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={handleDrop}
-              className={`flex flex-col justify-center items-center w-full h-48 px-6 pt-5 pb-6 border-2 border-dashed rounded-md cursor-pointer transition-colors ${isDragging ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500'}`}
-            >
-              <div className="space-y-1 text-center">
-                <UploadCloud className="mx-auto h-12 w-12 text-slate-400" />
-                <div className="flex text-sm text-slate-600 dark:text-slate-400">
-                  <p>Arraste e solte ou <span className="font-semibold text-primary-600 dark:text-primary-400">procure uma imagem</span></p>
-                  <input id="image-upload" name="image-upload" type="file" accept="image/*" className="sr-only" onChange={(e) => handleFileChange(e.target.files)} />
                 </div>
-                <p className="text-xs text-slate-500">PNG, JPG, GIF, etc.</p>
-              </div>
-            </label>
-          )}
+            ) : (
+                <div className="relative">
+                    <textarea
+                    id="instructions"
+                    value={instructions}
+                    onChange={(e) => {
+                        setInstructions(e.target.value);
+                        if (selectedRuleId) setSelectedRuleId('');
+                    }}
+                    rows={3}
+                    className="block w-full rounded-md border-slate-300 dark:border-slate-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 bg-white dark:bg-slate-800 sm:text-sm pr-10"
+                    placeholder="Ex: 'Ignorar o endereço', 'O evento é na próxima semana'"
+                    />
+                     <button
+                        onClick={handleStartSaveRule}
+                        disabled={!instructions.trim()}
+                        className="absolute top-2 right-2 p-1.5 text-slate-500 hover:text-primary-600 disabled:text-slate-400 disabled:cursor-not-allowed rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
+                        aria-label="Salvar instrução como uma nova regra"
+                     >
+                        <Save size={18} />
+                     </button>
+                </div>
+            )}
+          </div>
         </div>
-
-        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-t dark:border-slate-700 flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-slate-700 bg-white dark:bg-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm hover:bg-slate-50 dark:hover:bg-slate-600"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={handleProcessImage}
-            disabled={!selectedFile || isLoading}
-            className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md shadow-sm hover:bg-primary-700 disabled:bg-primary-300 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {isLoading ? <Loader2 className="animate-spin" size={18} /> : null}
-            {isLoading ? 'Analisando...' : 'Analisar e Criar'}
-          </button>
-        </div>
-
-        <button onClick={onClose} className="absolute top-3 right-3 p-1 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700" aria-label="Fechar">
-          <X size={20} />
-        </button>
-      </div>
-      <style>{`
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .animate-fade-in { animation: fadeIn 0.2s ease-out; }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .animate-slide-up { animation: slideUp 0.3s ease-out; }
-      `}</style>
-    </div>
+      ) : (
+        <label
+          htmlFor="image-upload"
+          onDragEnter={() => setIsDragging(true)}
+          onDragLeave={() => setIsDragging(false)}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleDrop}
+          className={`flex flex-col justify-center items-center w-full h-48 px-6 pt-5 pb-6 border-2 border-dashed rounded-md cursor-pointer transition-colors ${isDragging ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500'}`}
+        >
+          <div className="space-y-1 text-center">
+            <UploadCloud className="mx-auto h-12 w-12 text-slate-400" />
+            <div className="flex text-sm text-slate-600 dark:text-slate-400">
+              <p>Arraste e solte ou <span className="font-semibold text-primary-600 dark:text-primary-400">procure uma imagem</span></p>
+              <input id="image-upload" name="image-upload" type="file" accept="image/*" className="sr-only" onChange={(e) => handleFileChange(e.target.files)} />
+            </div>
+            <p className="text-xs text-slate-500">PNG, JPG, GIF, etc.</p>
+          </div>
+        </label>
+      )}
+    </Modal>
   );
 };
 

@@ -6,6 +6,7 @@ export const useAiAssist = () => {
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
 
   const getSuggestions = useCallback(async (text: string, currentTitle?: string) => {
+    // FIX: Per coding guidelines, use process.env.API_KEY to access the Gemini API key.
     if (!process.env.API_KEY) {
       console.log("AI Assist disabled. API_KEY not provided.");
       return null;

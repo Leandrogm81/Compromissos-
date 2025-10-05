@@ -1,19 +1,16 @@
-
 import React from 'react';
 import Header from './Header';
-import type { AppView } from '../App';
 
 interface LayoutProps {
   children: React.ReactNode;
   title: string;
-  setView: (view: AppView) => void;
   showBackButton?: boolean;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, title, setView, showBackButton = false }) => {
+const Layout: React.FC<LayoutProps> = ({ children, title, showBackButton = false }) => {
   return (
     <div className="max-w-2xl mx-auto">
-      <Header title={title} setView={setView} showBackButton={showBackButton} />
+      <Header title={title} showBackButton={showBackButton} />
       <main className="pb-20">
         {children}
       </main>
