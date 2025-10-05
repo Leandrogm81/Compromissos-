@@ -148,7 +148,15 @@ const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, o
           </p>
            {description && (
              <div className="mt-2">
-               <p className={`text-sm text-slate-500 dark:text-slate-400 whitespace-pre-wrap break-words ${isLongDescription && !isExpanded ? 'line-clamp-3' : ''}`}>
+               <p 
+                className="text-sm text-slate-500 dark:text-slate-400 whitespace-pre-wrap break-words"
+                style={isLongDescription && !isExpanded ? {
+                    display: '-webkit-box',
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                } : {}}
+               >
                  {description}
                </p>
                {isLongDescription && (
