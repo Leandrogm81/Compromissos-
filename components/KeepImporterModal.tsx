@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Clipboard, Image as ImageIcon, Trash2, ClipboardPaste } from 'lucide-react';
+import { Clipboard, Image as ImageIcon, Trash2, ClipboardPaste, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Reminder, Attachment } from '../types';
 import { calculateFileHash } from '../services/fileService';
 import Modal from './Modal';
+import { useClipboardPaste } from '../hooks/useClipboardPaste';
 
 interface KeepImporterModalProps {
   isOpen: boolean;
@@ -37,20 +38,11 @@ const KeepImporterModal: React.FC<KeepImporterModalProps> = ({ isOpen, onClose, 
     }
   }, [isOpen]);
 
-  const processFiles = useCallback(async (files: File[] | Blob[]) => {
+  const processFiles = useCallback(async (files: File[]) => {
     const newAttachments: Attachment[] = [];
-    const filesArray = Array.from(files);
 
-    for (const item of filesArray) {
-      let file: File;
-      if (item instanceof File) {
-        file = item;
-      } else if (item instanceof Blob && item.type.startsWith('image/')) {
-        const extension = item.type.split('/')[1] || 'png';
-        file = new File([item], `pasted_image.${extension}`, { type: item.type });
-      } else {
-        continue;
-      }
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) continue;
 
       try {
         const hash = await calculateFileHash(file);
@@ -77,68 +69,7 @@ const KeepImporterModal: React.FC<KeepImporterModalProps> = ({ isOpen, onClose, 
     }
   }, []);
 
-  const readImagesFromClipboard = useCallback(async (): Promise<File[] | null> => {
-    if (!navigator.clipboard || !navigator.clipboard.read) {
-      return null;
-    }
-    try {
-      const clipboardItems = await navigator.clipboard.read();
-      const imageFiles: File[] = [];
-      for (const item of clipboardItems) {
-        const imageType = Array.from(item.types).find(type => type.startsWith('image/'));
-        if (imageType) {
-          const blob = await item.getType(imageType);
-          const extension = blob.type.split('/')[1] || 'png';
-          const file = new File([blob], `pasted_image.${extension}`, { type: blob.type });
-          imageFiles.push(file);
-        }
-      }
-      return imageFiles;
-    } catch (err: any) {
-      if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
-        toast.error("Permissão para acessar a área de transferência negada.");
-      } else {
-        console.error("Clipboard API error:", err);
-        toast.error("Não foi possível ler da área de transferência.");
-      }
-      return [];
-    }
-  }, []);
-
-  const handlePasteButtonClick = useCallback(async () => {
-    const files = await readImagesFromClipboard();
-    if (files === null) {
-      toast.error("Seu navegador não suporta a colagem de imagens diretamente. Use o botão 'Adicionar Imagem'.", { id: 'clipboard-unsupported' });
-    } else if (files.length > 0) {
-      await processFiles(files);
-    } else {
-      toast.error("Nenhuma imagem encontrada na área de transferência.", { id: 'no-image-found' });
-    }
-  }, [readImagesFromClipboard, processFiles]);
-
-  const handlePaste = useCallback(async (event: React.ClipboardEvent<HTMLDivElement>) => {
-    const filesFromModernAPI = await readImagesFromClipboard();
-    if (filesFromModernAPI && filesFromModernAPI.length > 0) {
-      event.preventDefault();
-      await processFiles(filesFromModernAPI);
-      return;
-    }
-    if (filesFromModernAPI?.length === 0) return;
-    const filesFromFallback: File[] = [];
-    if (event.clipboardData) {
-      const items = event.clipboardData.items;
-      for (let i = 0; i < items.length; i++) {
-        if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
-          const file = items[i].getAsFile();
-          if (file) filesFromFallback.push(file);
-        }
-      }
-    }
-    if (filesFromFallback.length > 0) {
-      event.preventDefault();
-      await processFiles(filesFromFallback);
-    }
-  }, [readImagesFromClipboard, processFiles]);
+  const { pasteFromClipboard, isReading } = useClipboardPaste(processFiles);
   
   const handleFileSelected = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0) {
@@ -197,7 +128,7 @@ const KeepImporterModal: React.FC<KeepImporterModalProps> = ({ isOpen, onClose, 
       className="max-w-2xl h-[85vh]"
       footer={modalFooter}
     >
-        <div className="space-y-6 h-full" onPaste={handlePaste}>
+        <div className="space-y-6 h-full">
           <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400 text-blue-800 dark:text-blue-200 rounded-lg">
             <p className="font-semibold">Como importar:</p>
             <ol className="list-decimal list-inside text-sm mt-1 space-y-1">
@@ -243,11 +174,12 @@ const KeepImporterModal: React.FC<KeepImporterModalProps> = ({ isOpen, onClose, 
                 <div className="flex items-center gap-2">
                     <button
                         type="button"
-                        onClick={handlePasteButtonClick}
-                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600"
+                        onClick={pasteFromClipboard}
+                        disabled={isReading}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 disabled:opacity-50"
                     >
-                        <ClipboardPaste size={16} />
-                        Colar Imagem
+                        {isReading ? <Loader2 size={16} className="animate-spin" /> : <ClipboardPaste size={16} />}
+                        {isReading ? 'Lendo...' : 'Colar Imagem'}
                     </button>
                     <button
                         type="button"

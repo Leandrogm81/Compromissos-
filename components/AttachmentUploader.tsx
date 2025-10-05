@@ -1,8 +1,9 @@
 import React, { useCallback, useState, useMemo, useEffect } from 'react';
 import type { Attachment } from '../types';
 import { calculateFileHash } from '../services/fileService';
-import { Paperclip, X, FileText, Image as ImageIcon, AlertTriangle } from 'lucide-react';
+import { Paperclip, X, FileText, Image as ImageIcon, AlertTriangle, ClipboardPaste, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useClipboardPaste } from '../hooks/useClipboardPaste';
 
 interface AttachmentUploaderProps {
   attachments: Attachment[];
@@ -38,13 +39,13 @@ const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({ attachments, se
     return { count, totalSize };
   }, [attachments]);
   
-  const handleFileProcessing = useCallback(async (files: FileList) => {
+  const handleFileProcessing = useCallback(async (files: File[]) => {
     const newAttachments: Attachment[] = [];
     let runningSize = currentStats.totalSize;
     let runningCount = currentStats.count;
     const validationErrors: string[] = [];
     
-    for (const file of Array.from(files)) {
+    for (const file of files) {
       if (runningCount >= MAX_FILES) {
         validationErrors.push(`Limite de ${MAX_FILES} arquivos atingido.`);
         break;
@@ -95,10 +96,12 @@ const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({ attachments, se
     }
 
   }, [currentStats, setAttachments]);
+  
+  const { pasteFromClipboard, isReading } = useClipboardPaste(handleFileProcessing);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      handleFileProcessing(e.target.files);
+      handleFileProcessing(Array.from(e.target.files));
       e.target.value = '';
     }
   };
@@ -108,7 +111,7 @@ const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({ attachments, se
     e.stopPropagation();
     setIsDragging(false);
     if (e.dataTransfer.files) {
-      handleFileProcessing(e.dataTransfer.files);
+      handleFileProcessing(Array.from(e.dataTransfer.files));
     }
   };
   
@@ -132,26 +135,37 @@ const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({ attachments, se
         )}
         
         {!hasReachedLimit && (
-            <label
-                htmlFor="file-upload"
-                onDragEnter={() => setIsDragging(true)}
-                onDragLeave={() => setIsDragging(false)}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={handleDrop}
-                className={`
-                flex flex-col justify-center items-center w-full px-6 pt-5 pb-6 border-2 border-dashed rounded-md cursor-pointer
-                ${isDragging ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500'}
-                `}
-            >
-                <div className="space-y-1 text-center">
-                    <Paperclip className="mx-auto h-8 w-8 text-slate-400" />
-                    <div className="flex text-sm text-slate-600 dark:text-slate-400">
-                    <p>Arraste e solte ou <span className="text-primary-600 dark:text-primary-400 font-semibold">procure arquivos</span></p>
-                    <input id="file-upload" name="file-upload" type="file" className="sr-only" multiple onChange={handleFileChange} />
+            <div className="space-y-2">
+                <label
+                    htmlFor="file-upload"
+                    onDragEnter={() => setIsDragging(true)}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={handleDrop}
+                    className={`
+                    flex flex-col justify-center items-center w-full px-6 pt-5 pb-6 border-2 border-dashed rounded-md cursor-pointer
+                    ${isDragging ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500'}
+                    `}
+                >
+                    <div className="space-y-1 text-center">
+                        <Paperclip className="mx-auto h-8 w-8 text-slate-400" />
+                        <div className="flex text-sm text-slate-600 dark:text-slate-400">
+                        <p>Arraste e solte ou <span className="text-primary-600 dark:text-primary-400 font-semibold">procure arquivos</span></p>
+                        <input id="file-upload" name="file-upload" type="file" className="sr-only" multiple onChange={handleFileChange} />
+                        </div>
+                        <p className="text-xs text-slate-500">Imagens e PDF, até {MAX_SIZE_MB}MB cada.</p>
                     </div>
-                    <p className="text-xs text-slate-500">Imagens e PDF, até {MAX_SIZE_MB}MB cada.</p>
-                </div>
-            </label>
+                </label>
+                 <button
+                    type="button"
+                    onClick={pasteFromClipboard}
+                    disabled={isReading}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 disabled:opacity-50"
+                >
+                    {isReading ? <Loader2 size={16} className="animate-spin" /> : <ClipboardPaste size={16} />}
+                    {isReading ? 'Lendo...' : 'Colar Imagem da Área de Transferência'}
+                </button>
+            </div>
         )}
       
       <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">

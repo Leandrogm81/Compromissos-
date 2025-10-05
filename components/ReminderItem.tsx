@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { Reminder } from '../types';
 import { ReminderStatus, Recurrence } from '../types';
 import { differenceInHours } from 'date-fns';
@@ -67,7 +67,32 @@ const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, o
   
   const proximityClass = getProximityClass(reminder.datetime, isDone);
   
-  const imageAttachments = reminder.attachments?.filter(att => att.type.startsWith('image/')) || [];
+  const imageAttachments = useMemo(() => reminder.attachments?.filter(att => att.type.startsWith('image/')) || [], [reminder.attachments]);
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const newImageUrls: Record<string, string> = {};
+    const urlsToRevoke: string[] = [];
+
+    imageAttachments.forEach(att => {
+        // If there's a blob, it means the data is persisted. Create a URL for it.
+        // This is the key fix for images disappearing on reload.
+        if (att.blob && !att.localUrl) {
+            const url = URL.createObjectURL(att.blob);
+            newImageUrls[att.id] = url;
+            urlsToRevoke.push(url);
+        }
+    });
+
+    if (urlsToRevoke.length > 0) {
+        setImageUrls(prev => ({...prev, ...newImageUrls}));
+    }
+
+    // Cleanup function to revoke the created object URLs to prevent memory leaks.
+    return () => {
+        urlsToRevoke.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [imageAttachments]);
   
   const renderIcon = (iconName?: string) => {
     if (!iconName) return null;
@@ -170,15 +195,22 @@ const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, o
             )}
            {imageAttachments.length > 0 && (
             <div className="mt-3 flex gap-2 flex-wrap">
-              {imageAttachments.map(att => (
-                <img
-                  key={att.id}
-                  src={att.localUrl}
-                  alt={att.name}
-                  className="h-16 w-16 rounded-md object-cover cursor-pointer transition-transform hover:scale-105"
-                  onClick={() => onViewImage(att.localUrl!)}
-                />
-              ))}
+              {imageAttachments.map(att => {
+                // Prioritize the original localUrl if it exists (for new uploads),
+                // otherwise use the dynamically created URL from the blob.
+                const imageUrl = att.localUrl || imageUrls[att.id];
+                if (!imageUrl) return null;
+                
+                return (
+                    <img
+                    key={att.id}
+                    src={imageUrl}
+                    alt={att.name}
+                    className="h-16 w-16 rounded-md object-cover cursor-pointer transition-transform hover:scale-105"
+                    onClick={() => onViewImage(imageUrl)}
+                    />
+                );
+              })}
             </div>
            )}
         </div>
