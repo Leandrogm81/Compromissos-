@@ -21,7 +21,9 @@ const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({ attachments, se
   const [isDragging, setIsDragging] = useState(false);
   
   useEffect(() => {
-    // Cleanup function to revoke Object URLs to prevent memory leaks.
+    // This effect's cleanup is now correctly scoped to the attachments it's managing.
+    // When the component unmounts, it revokes URLs for the last set of attachments it displayed.
+    // When attachments change, it revokes the old ones and the effect for the new state sets up the next cleanup.
     return () => {
         attachments.forEach(att => {
             if (att.localUrl) {
@@ -29,9 +31,7 @@ const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({ attachments, se
             }
         });
     };
-  // FIX: An empty dependency array ensures this effect runs only once on mount and unmount.
-  // The original file was corrupted here, so ensuring correctness.
-  }, []); // Run only on component unmount
+  }, [attachments]);
 
   const currentStats = useMemo(() => {
     const count = attachments.length;
@@ -153,7 +153,7 @@ const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({ attachments, se
                         <p>Arraste e solte ou <span className="text-primary-600 dark:text-primary-400 font-semibold">procure arquivos</span></p>
                         <input id="file-upload" name="file-upload" type="file" className="sr-only" multiple onChange={handleFileChange} />
                         </div>
-                        <p className="text-xs text-slate-500">Imagens e PDF, até {MAX_SIZE_MB}MB cada.</p>
+                        <p className="text-xs text-slate-500">Imagens e PDF, até {MAX_SIZE_MB} cada.</p>
                     </div>
                 </label>
                  <button

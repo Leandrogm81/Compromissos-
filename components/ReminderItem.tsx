@@ -123,6 +123,7 @@ const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, o
 
 
   return (
+    <>
     <div className={`
       p-4 rounded-lg shadow-md transition-all ${proximityClass}
       ${isDone 
@@ -149,13 +150,7 @@ const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, o
            {description && (
              <div className="mt-2">
                <p 
-                className="text-sm text-slate-500 dark:text-slate-400 whitespace-pre-wrap break-words"
-                style={isLongDescription && !isExpanded ? {
-                    display: '-webkit-box',
-                    WebkitLineClamp: 3,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                } : {}}
+                className={`text-sm text-slate-500 dark:text-slate-400 whitespace-pre-wrap break-words ${isLongDescription && !isExpanded ? 'line-clamp-3-custom' : ''}`}
                >
                  {description}
                </p>
@@ -235,6 +230,15 @@ const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, o
         </div>
       </div>
     </div>
+    <style>{`
+      .line-clamp-3-custom {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+    `}</style>
+    </>
   );
 };
 
