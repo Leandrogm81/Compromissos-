@@ -47,21 +47,21 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ imageUrl, onClose }) => {
   }, []);
   
   const handleZoom = useCallback((factor: number, clientX: number, clientY: number) => {
-    if (!containerRef.current || !imageRef.current) return;
+    if (!containerRef.current) return;
     
     const newScale = Math.max(1, Math.min(scale * factor, 8));
     if (newScale === scale) return;
 
     const rect = containerRef.current.getBoundingClientRect();
     
-    const imageX = (rect.width / 2) + position.x;
-    const imageY = (rect.height / 2) + position.y;
+    const containerCenterX = rect.width / 2;
+    const containerCenterY = rect.height / 2;
 
     const mouseX = clientX - rect.left;
     const mouseY = clientY - rect.top;
 
-    const newX = position.x - ((mouseX - imageX) * (newScale - scale) / (scale * newScale));
-    const newY = position.y - ((mouseY - imageY) * (newScale - scale) / (scale * newScale));
+    const newX = position.x - ((mouseX - containerCenterX) * (newScale - scale)) / (scale * newScale);
+    const newY = position.y - ((mouseY - containerCenterY) * (newScale - scale)) / (scale * newScale);
     
     const newPosition = { x: newX, y: newY };
 
@@ -81,21 +81,21 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ imageUrl, onClose }) => {
     if (scale > 1) {
       isPanning.current = true;
       lastPosition.current = { x: e.clientX, y: e.clientY };
-      if (imageRef.current) imageRef.current.style.cursor = 'grabbing';
+      if (containerRef.current) containerRef.current.style.cursor = 'grabbing';
     }
   }, [scale]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isPanning.current) return;
-    const dx = (e.clientX - lastPosition.current.x);
-    const dy = (e.clientY - lastPosition.current.y);
+    const dx = (e.clientX - lastPosition.current.x) / scale;
+    const dy = (e.clientY - lastPosition.current.y) / scale;
     lastPosition.current = { x: e.clientX, y: e.clientY };
     setPosition(prev => clampPosition({ x: prev.x + dx, y: prev.y + dy }, scale));
   }, [scale, clampPosition]);
   
   const handleMouseUp = useCallback(() => {
     isPanning.current = false;
-    if (imageRef.current) imageRef.current.style.cursor = 'grab';
+    if (containerRef.current) containerRef.current.style.cursor = 'grab';
   }, []);
 
   const getPinchDistance = (e: TouchEvent) => {
@@ -111,8 +111,10 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ imageUrl, onClose }) => {
 
   const handleTouchStart = useCallback((e: TouchEvent) => {
     if (e.touches.length === 2) {
+      e.preventDefault();
       lastPinchDist.current = getPinchDistance(e);
     } else if (e.touches.length === 1 && scale > 1) {
+      e.preventDefault();
       isPanning.current = true;
       lastPosition.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     }
@@ -120,16 +122,18 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ imageUrl, onClose }) => {
 
   const handleTouchMove = useCallback((e: TouchEvent) => {
     if (e.touches.length === 2) {
+      e.preventDefault();
       const newDist = getPinchDistance(e);
       const factor = newDist / lastPinchDist.current;
       lastPinchDist.current = newDist;
       const center = getPinchCenter(e);
       handleZoom(factor, center.x, center.y);
     } else if (e.touches.length === 1 && isPanning.current) {
-      const dx = (e.touches[0].clientX - lastPosition.current.x);
-      const dy = (e.touches[0].clientY - lastPosition.current.y);
+      e.preventDefault();
+      const dx = (e.touches[0].clientX - lastPosition.current.x) / scale;
+      const dy = (e.touches[0].clientY - lastPosition.current.y) / scale;
       lastPosition.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      setPosition(prev => clampPosition({ x: prev.x + dy, y: prev.y + dy }, scale));
+      setPosition(prev => clampPosition({ x: prev.x + dx, y: prev.y + dy }, scale));
     }
   }, [scale, handleZoom, clampPosition]);
 
@@ -168,23 +172,21 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ imageUrl, onClose }) => {
     >
       <div
         ref={containerRef}
-        className="w-full h-full flex items-center justify-center"
+        className="w-full h-full flex items-center justify-center overflow-hidden"
+        style={{ cursor: scale > 1 ? 'grab' : 'default' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div
+        <img
           ref={imageRef}
-          className="relative transition-transform duration-100 ease-out"
+          src={imageUrl}
+          alt="Visualização ampliada do anexo"
+          className="max-w-[90vw] max-h-[90vh] object-contain shadow-2xl rounded-lg select-none"
           style={{
             transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-            cursor: scale > 1 ? (isPanning.current ? 'grabbing' : 'grab') : 'default',
+            transition: isPanning.current ? 'none' : 'transform 0.1s ease-out',
+            willChange: 'transform'
           }}
-        >
-            <img
-            src={imageUrl}
-            alt="Visualização ampliada do anexo"
-            className="max-w-[90vw] max-h-[90vh] object-contain shadow-2xl rounded-lg"
-            />
-        </div>
+        />
       </div>
 
       <button
@@ -204,7 +206,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ imageUrl, onClose }) => {
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .animate-fade-in { animation: fadeIn 0.2s ease-out; }
-        .image-viewer-transform { transform-origin: center; }
       `}</style>
     </div>
   );
