@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import type { AppView } from '../App';
 import { Page } from '../App';
@@ -12,10 +13,11 @@ import { usePushManager } from '../hooks/usePushManager';
 interface FormPageProps {
   setView: (view: AppView) => void;
   reminderId?: string;
+  initialData?: Partial<Reminder>;
 }
 
-const FormPage: React.FC<FormPageProps> = ({ setView, reminderId }) => {
-  const [initialData, setInitialData] = useState<Reminder | undefined>(undefined);
+const FormPage: React.FC<FormPageProps> = ({ setView, reminderId, initialData: propInitialData }) => {
+  const [initialData, setInitialData] = useState<Partial<Reminder> | undefined>(propInitialData);
   const [isLoading, setIsLoading] = useState(true);
   const { addReminder, updateReminder, getReminderById } = useReminders();
   const { permission, request: requestNotifications } = usePushManager();
@@ -23,6 +25,12 @@ const FormPage: React.FC<FormPageProps> = ({ setView, reminderId }) => {
   const isEditing = !!reminderId;
 
   useEffect(() => {
+    if (propInitialData) {
+      setInitialData(propInitialData);
+      setIsLoading(false);
+      return;
+    }
+
     if (isEditing) {
       const id = parseInt(reminderId, 10);
       getReminderById(id).then(reminder => {
@@ -33,7 +41,7 @@ const FormPage: React.FC<FormPageProps> = ({ setView, reminderId }) => {
       setIsLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reminderId, isEditing]);
+  }, [reminderId, isEditing, propInitialData]);
 
   const handleSubmit = async (formData: Omit<Reminder, 'id' | 'createdAt' | 'updatedAt' | 'status'>) => {
     try {
@@ -97,7 +105,7 @@ const FormPage: React.FC<FormPageProps> = ({ setView, reminderId }) => {
             ) : (
                 <ReminderForm
                     onSubmit={handleSubmit}
-                    initialData={initialData}
+                    initialData={initialData as Reminder | undefined}
                     onCancel={() => setView({ page: Page.List })}
                 />
             )}

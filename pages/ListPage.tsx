@@ -7,7 +7,7 @@ import { useReminders } from '../hooks/useReminders';
 import ReminderList from '../components/ReminderList';
 import CalendarView from '../components/CalendarView';
 import Layout from '../components/Layout';
-import { Plus, Search, List, Calendar, Sparkles, Loader2 } from 'lucide-react';
+import { Plus, Search, List, Calendar, Sparkles, Loader2, ImagePlus, FileUp } from 'lucide-react';
 import { ReminderStatus } from '../types';
 import { isToday, isTomorrow, isThisWeek, parseISO } from 'date-fns';
 import { summarizeReminders } from '../services/aiService';
@@ -16,11 +16,14 @@ import toast from 'react-hot-toast';
 interface ListPageProps {
   setView: (view: AppView) => void;
   onViewImage: (url: string) => void;
+  setIsAiCreatorOpen: (isOpen: boolean) => void;
+  setIsImageToTextModalOpen: (isOpen: boolean) => void;
+  setIsKeepImporterOpen: (isOpen: boolean) => void;
 }
 
 type ActiveView = 'list' | 'calendar';
 
-const ListPage: React.FC<ListPageProps> = ({ setView, onViewImage }) => {
+const ListPage: React.FC<ListPageProps> = ({ setView, onViewImage, setIsAiCreatorOpen, setIsImageToTextModalOpen, setIsKeepImporterOpen }) => {
   const { reminders, toggleReminderStatus, deleteReminder, updateSubtaskStatus } = useReminders();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeView, setActiveView] = useState<ActiveView>('list');
@@ -34,7 +37,7 @@ const ListPage: React.FC<ListPageProps> = ({ setView, onViewImage }) => {
   const filteredReminders = useMemo(() => {
     if (activeView === 'calendar') return pendingReminders;
 
-    const lowercasedQuery = searchQuery.toLowerCase();
+    const lowercasedQuery = searchQuery.toLowerCase().trim();
     if (!lowercasedQuery) {
         return pendingReminders;
     }
@@ -125,6 +128,38 @@ const ListPage: React.FC<ListPageProps> = ({ setView, onViewImage }) => {
     }
   };
 
+  const handleExportToGoogleCalendar = (reminderId: number) => {
+    const reminder = reminders?.find(r => r.id === reminderId);
+    if (!reminder) {
+        toast.error('Lembrete não encontrado para exportação.');
+        return;
+    }
+
+    const formatDate = (date: Date) => {
+      // Formats to YYYYMMDDTHHMMSSZ
+      return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    };
+
+    const startDate = new Date(reminder.datetime);
+    // Google Calendar events need an end time. Default to 1 hour duration.
+    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); 
+
+    const dates = `${formatDate(startDate)}/${formatDate(endDate)}`;
+    const title = encodeURIComponent(reminder.title);
+    
+    // Add a note about attachments not being exportable
+    const description = reminder.description || '';
+    const detailsText = `${description}\n\n---\nNota: Anexos (imagens, etc.) não são incluídos na exportação para o Google Calendar.`;
+    const details = encodeURIComponent(detailsText);
+    
+    const timezone = encodeURIComponent(reminder.timezone);
+
+    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}&ctz=${timezone}`;
+    
+    window.open(url, '_blank', 'noopener,noreferrer');
+    toast.success('Abrindo no Google Calendar...');
+  };
+
   const hasTodayReminders = groupedReminders['Hoje'] && groupedReminders['Hoje'].length > 0;
 
   return (
@@ -194,6 +229,7 @@ const ListPage: React.FC<ListPageProps> = ({ setView, onViewImage }) => {
                         onEdit={handleEditReminder}
                         onViewImage={onViewImage}
                         onUpdateSubtaskStatus={updateSubtaskStatus}
+                        onExport={handleExportToGoogleCalendar}
                       />
                     </div>
                   );
@@ -213,13 +249,40 @@ const ListPage: React.FC<ListPageProps> = ({ setView, onViewImage }) => {
           />
         )}
       </div>
-      <button
-        onClick={() => setView({ page: Page.Form })}
-        className="fixed bottom-6 right-6 bg-primary-600 hover:bg-primary-700 text-white rounded-full p-4 shadow-lg transition-transform transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:focus:ring-offset-slate-900"
-        aria-label="Criar novo lembrete"
-      >
-        <Plus size={24} />
-      </button>
+      <div className="fixed bottom-6 right-6 flex flex-col items-center gap-3">
+        <button
+          onClick={() => setIsKeepImporterOpen(true)}
+          className="bg-yellow-500 hover:bg-yellow-600 text-white rounded-full p-3 shadow-lg transition-transform transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 dark:focus:ring-offset-slate-900"
+          aria-label="Importar do Google Keep"
+        >
+          <FileUp size={20} />
+        </button>
+        {process.env.API_KEY && (
+          <>
+            <button
+              onClick={() => setIsImageToTextModalOpen(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-3 shadow-lg transition-transform transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-slate-900"
+              aria-label="Criar lembrete a partir de uma imagem"
+            >
+              <ImagePlus size={20} />
+            </button>
+            <button
+              onClick={() => setIsAiCreatorOpen(true)}
+              className="bg-purple-600 hover:bg-purple-700 text-white rounded-full p-3 shadow-lg transition-transform transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 dark:focus:ring-offset-slate-900"
+              aria-label="Criar lembrete com IA"
+            >
+              <Sparkles size={20} />
+            </button>
+          </>
+        )}
+        <button
+          onClick={() => setView({ page: Page.Form })}
+          className="bg-primary-600 hover:bg-primary-700 text-white rounded-full p-4 shadow-lg transition-transform transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:focus:ring-offset-slate-900"
+          aria-label="Criar novo lembrete"
+        >
+          <Plus size={24} />
+        </button>
+      </div>
     </Layout>
   );
 };

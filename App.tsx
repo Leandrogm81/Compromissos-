@@ -12,6 +12,9 @@ import { db } from './services/db';
 import { scheduleNotificationsForReminder } from './services/notificationService';
 import { ReminderStatus } from './types';
 import ImageViewer from './components/ImageViewer';
+import AiChatModal from './components/AiCreatorModal';
+import ImageToTextModal from './components/ImageToTextModal';
+import KeepImporterModal from './components/KeepImporterModal';
 
 export enum Page {
   List,
@@ -22,7 +25,7 @@ export enum Page {
 
 export type AppView = 
   | { page: Page.List }
-  | { page: Page.Form, reminderId?: string }
+  | { page: Page.Form, reminderId?: string, initialData?: Partial<Reminder> }
   | { page: Page.Settings }
   | { page: Page.Resolved };
 
@@ -36,6 +39,9 @@ const App: React.FC = () => {
 
   const [view, setView] = useState<AppView>({ page: Page.List });
   const [viewingImage, setViewingImage] = useState<string | null>(null);
+  const [isAiCreatorOpen, setIsAiCreatorOpen] = useState(false);
+  const [isImageToTextModalOpen, setIsImageToTextModalOpen] = useState(false);
+  const [isKeepImporterOpen, setIsKeepImporterOpen] = useState(false);
   
   // This hook will get all pending reminders and keep the list updated.
   const pendingReminders = useLiveQuery(() =>
@@ -52,21 +58,54 @@ const App: React.FC = () => {
     }
   }, [pendingReminders]);
 
+  // Effect to register the Service Worker
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      // The Service Worker script must be loaded from the same origin as the app.
+      // A root-relative path like '/sw.js' can fail in sandboxed environments if the
+      // base URI is resolved incorrectly. By constructing an absolute URL, we ensure
+      // it always loads from the correct origin.
+      const swUrl = `${window.location.origin}/sw.js`;
+      navigator.serviceWorker.register(swUrl)
+        .then(registration => {
+          console.log('Service Worker registered successfully:', registration);
+        })
+        .catch(error => {
+          console.error('Service Worker registration failed:', error);
+        });
+    }
+  }, []);
+
 
   const themeValue = useMemo(() => ({ theme, setTheme }), [theme]);
+
+  const handleAiGeneratedReminder = (data: Partial<Reminder>) => {
+    setIsAiCreatorOpen(false);
+    setView({ page: Page.Form, initialData: data });
+  };
+  
+  const handleImageGeneratedReminder = (data: Partial<Reminder>) => {
+    setIsImageToTextModalOpen(false);
+    setView({ page: Page.Form, initialData: data });
+  };
+  
+  const handleKeepImport = (data: Partial<Reminder>) => {
+    setIsKeepImporterOpen(false);
+    setView({ page: Page.Form, initialData: data });
+  };
 
   const renderPage = () => {
     switch (view.page) {
       case Page.List:
-        return <ListPage setView={setView} onViewImage={setViewingImage} />;
+        return <ListPage setView={setView} onViewImage={setViewingImage} setIsAiCreatorOpen={setIsAiCreatorOpen} setIsImageToTextModalOpen={setIsImageToTextModalOpen} setIsKeepImporterOpen={setIsKeepImporterOpen} />;
       case Page.Form:
-        return <FormPage setView={setView} reminderId={view.reminderId} />;
+        return <FormPage setView={setView} reminderId={view.reminderId} initialData={view.initialData} />;
       case Page.Settings:
         return <SettingsPage setView={setView} />;
       case Page.Resolved:
         return <ResolvedPage setView={setView} onViewImage={setViewingImage} />;
       default:
-        return <ListPage setView={setView} onViewImage={setViewingImage} />;
+        return <ListPage setView={setView} onViewImage={setViewingImage} setIsAiCreatorOpen={setIsAiCreatorOpen} setIsImageToTextModalOpen={setIsImageToTextModalOpen} setIsKeepImporterOpen={setIsKeepImporterOpen} />;
     }
   };
 
@@ -82,7 +121,26 @@ const App: React.FC = () => {
           }}
         />
         {viewingImage && <ImageViewer imageUrl={viewingImage} onClose={() => setViewingImage(null)} />}
+        {isAiCreatorOpen && (
+          <AiChatModal
+            onClose={() => setIsAiCreatorOpen(false)}
+            onComplete={handleAiGeneratedReminder}
+          />
+        )}
+        {isImageToTextModalOpen && (
+          <ImageToTextModal
+            onClose={() => setIsImageToTextModalOpen(false)}
+            onComplete={handleImageGeneratedReminder}
+          />
+        )}
+        {isKeepImporterOpen && (
+            <KeepImporterModal
+                onClose={() => setIsKeepImporterOpen(false)}
+                onComplete={handleKeepImport}
+            />
+        )}
       </div>
+    {/* FIX: Use ThemeContext.Provider instead of Theme.Context.Provider. 'Theme' is a type, not a context object. */}
     </ThemeContext.Provider>
   );
 };

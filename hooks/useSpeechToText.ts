@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 
 interface SpeechToTextOptions {
   onResult: (transcript: string) => void;
+  onInterimResult?: (transcript: string) => void;
   onEnd?: () => void;
 }
 
@@ -9,11 +10,11 @@ const SpeechRecognition =
   (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 const isSupported = !!SpeechRecognition;
 
-export const useSpeechToText = ({ onResult, onEnd }: SpeechToTextOptions) => {
+export const useSpeechToText = ({ onResult, onInterimResult, onEnd }: SpeechToTextOptions) => {
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
-  const fullTranscriptRef = useRef('');
+  const finalTranscriptRef = useRef('');
 
   useEffect(() => {
     if (!isSupported) {
@@ -27,14 +28,27 @@ export const useSpeechToText = ({ onResult, onEnd }: SpeechToTextOptions) => {
     recognition.continuous = true;
 
     recognition.onresult = (event: any) => {
-      let finalTranscriptChunk = '';
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
+      let interimTranscript = '';
+      let finalTranscript = '';
+      
+      // A abordagem mais robusta é reconstruir a transcrição inteira a cada evento
+      // para evitar erros de acumulação.
+      for (let i = 0; i < event.results.length; ++i) {
+        const transcriptPart = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          finalTranscriptChunk += event.results[i][0].transcript;
+          finalTranscript += transcriptPart;
+        } else {
+          interimTranscript += transcriptPart;
         }
       }
-      if (finalTranscriptChunk) {
-        fullTranscriptRef.current += finalTranscriptChunk.trim() + ' ';
+      
+      // Armazena a transcrição final mais recente na ref para ser usada no `onend`.
+      finalTranscriptRef.current = finalTranscript;
+
+      // O callback de resultado interino exibe a transcrição completa (final + provisória)
+      // para um feedback visual contínuo e preciso.
+      if (onInterimResult) {
+        onInterimResult(finalTranscript + interimTranscript);
       }
     };
 
@@ -45,8 +59,10 @@ export const useSpeechToText = ({ onResult, onEnd }: SpeechToTextOptions) => {
     
     recognition.onend = () => {
         setIsListening(false);
-        if (fullTranscriptRef.current) {
-            onResult(fullTranscriptRef.current.trim());
+        // Ao finalizar, envia a transcrição final completa e consolidada.
+        const result = finalTranscriptRef.current.trim();
+        if (result) {
+            onResult(result);
         }
         if (onEnd) onEnd();
     }
@@ -56,11 +72,12 @@ export const useSpeechToText = ({ onResult, onEnd }: SpeechToTextOptions) => {
     return () => {
       recognition.stop();
     };
-  }, [onResult, onEnd]);
+  }, [onResult, onInterimResult, onEnd]);
 
   const startListening = () => {
     if (recognitionRef.current && !isListening) {
-      fullTranscriptRef.current = '';
+      // Limpa a transcrição anterior para iniciar uma nova sessão limpa.
+      finalTranscriptRef.current = '';
       setError(null);
       recognitionRef.current.start();
       setIsListening(true);

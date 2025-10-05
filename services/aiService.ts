@@ -75,6 +75,69 @@ export async function suggestReminderFields(text: string, currentTitle?: string)
   }
 }
 
+export async function getReminderFromImage(
+  imageData: { mimeType: string, data: string },
+  instructions?: string
+): Promise<AiSuggestion> {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error('API key for Gemini not found.');
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  const todayInBrazil = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+
+  let prompt = `
+    Analise o texto na imagem fornecida para extrair informações para um lembrete.
+    O fuso horário de referência é São Paulo (America/Sao_Paulo). A data de hoje é ${todayInBrazil}.
+    Seu objetivo é identificar um título, uma descrição e, se possível, uma data e hora para o lembrete.
+    Responda estritamente com um objeto JSON contendo "title", "description" e "datetime".
+
+    - O "title" deve ser um resumo curto e objetivo do evento.
+    - A "description" deve conter o texto relevante extraído da imagem.
+    - O "datetime" deve estar no formato ISO 8601 UTC (ex: ${new Date().toISOString()}). Se não houver data/hora explícita na imagem, você pode omitir este campo ou basear-se em pistas contextuais.
+  `;
+  
+  if (instructions && instructions.trim()) {
+    prompt += `
+      
+      O usuário forneceu as seguintes regras ou contexto adicional. Leve-as em consideração com alta prioridade:
+      ---
+      ${instructions}
+      ---
+    `;
+  }
+  
+  const imagePart = {
+    inlineData: {
+      mimeType: imageData.mimeType,
+      data: imageData.data,
+    },
+  };
+  
+  const textPart = {
+    text: prompt
+  };
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: { parts: [imagePart, textPart] },
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: responseSchema,
+      },
+    });
+
+    const jsonText = response.text.trim();
+    return JSON.parse(jsonText) as AiSuggestion;
+  } catch (error) {
+    console.error("Error calling Gemini API for image analysis:", error);
+    throw new Error("Não foi possível analisar a imagem com a IA.");
+  }
+}
+
 export async function processVoiceTranscript(transcript: string): Promise<string> {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {

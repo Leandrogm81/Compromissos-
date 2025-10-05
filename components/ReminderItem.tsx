@@ -1,9 +1,8 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import type { Reminder } from '../types';
 import { ReminderStatus, Recurrence } from '../types';
 import { differenceInHours } from 'date-fns';
-import { Trash2, Edit, CheckCircle2, Circle, Repeat, CheckSquare, Square } from 'lucide-react';
+import { Trash2, Edit, CheckCircle2, Circle, Repeat, CheckSquare, Square, Briefcase, Pill, Plane, ShoppingCart, GraduationCap, Gift, Dog, Heart, Calendar, Code, Dumbbell, Music, ChevronDown, ChevronUp, Share2 } from 'lucide-react';
 
 interface ReminderItemProps {
   reminder: Reminder;
@@ -12,6 +11,7 @@ interface ReminderItemProps {
   onEdit: () => void;
   onViewImage: (url: string) => void;
   onUpdateSubtaskStatus: (subtaskId: string, done: boolean) => void;
+  onExport: () => void;
 }
 
 const BRAZIL_TIME_ZONE = 'America/Sao_Paulo';
@@ -52,7 +52,8 @@ const getProximityClass = (datetime: string, isDone: boolean): string => {
 };
 
 
-const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, onDelete, onEdit, onViewImage, onUpdateSubtaskStatus }) => {
+const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, onDelete, onEdit, onViewImage, onUpdateSubtaskStatus, onExport }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
   const isDone = reminder.status === ReminderStatus.Done;
   
   const reminderDate = new Date(reminder.datetime);
@@ -68,6 +69,36 @@ const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, o
   const proximityClass = getProximityClass(reminder.datetime, isDone);
   
   const imageAttachments = reminder.attachments?.filter(att => att.type.startsWith('image/')) || [];
+  
+  const renderIcon = (iconName?: string) => {
+    if (!iconName) return null;
+
+    if (iconName.startsWith('data:image/')) {
+        return <img src={iconName} alt="Ícone customizado" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />;
+    }
+    
+    const iconProps = { size: 22, className: "text-slate-500 dark:text-slate-400 flex-shrink-0" };
+
+    const iconMap: Record<string, React.ReactNode> = {
+        'briefcase': <Briefcase {...iconProps} />,
+        'pill': <Pill {...iconProps} />,
+        'plane': <Plane {...iconProps} />,
+        'shopping-cart': <ShoppingCart {...iconProps} />,
+        'graduation-cap': <GraduationCap {...iconProps} />,
+        'gift': <Gift {...iconProps} />,
+        'dog': <Dog {...iconProps} />,
+        'heart': <Heart {...iconProps} />,
+        'calendar': <Calendar {...iconProps} />,
+        'code': <Code {...iconProps} />,
+        'dumbbell': <Dumbbell {...iconProps} />,
+        'music': <Music {...iconProps} />,
+    };
+    
+    return iconMap[iconName] || null;
+  };
+
+  const description = reminder.description;
+  const isLongDescription = description && description.length > 120;
 
 
   return (
@@ -85,16 +116,30 @@ const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, o
             }
         </button>
         <div className="flex-1 min-w-0">
-          <p className={`font-semibold ${isDone ? 'line-through text-slate-500' : 'text-slate-800 dark:text-slate-100'}`}>
-            {reminder.title}
-          </p>
+          <div className="flex items-center gap-2">
+            {renderIcon(reminder.icon)}
+            <p className={`font-semibold ${isDone ? 'line-through text-slate-500' : 'text-slate-800 dark:text-slate-100'}`}>
+              {reminder.title}
+            </p>
+          </div>
           <p className={`text-sm ${isDone ? 'line-through text-slate-400' : 'text-slate-600 dark:text-slate-400'}`}>
             {formattedDate}
           </p>
-           {reminder.description && (
-             <p className="text-sm mt-2 text-slate-500 dark:text-slate-400 whitespace-pre-wrap break-words">
-               {reminder.description}
-             </p>
+           {description && (
+             <div className="mt-2">
+               <p className={`text-sm text-slate-500 dark:text-slate-400 whitespace-pre-wrap break-words ${isLongDescription && !isExpanded ? 'line-clamp-3' : ''}`}>
+                 {description}
+               </p>
+               {isLongDescription && (
+                 <button
+                   onClick={() => setIsExpanded(!isExpanded)}
+                   className="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline mt-1 flex items-center gap-1"
+                 >
+                   {isExpanded ? 'Ver menos' : 'Ver mais'}
+                   {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                 </button>
+               )}
+             </div>
            )}
            {reminder.recurrence !== Recurrence.None && !isDone && (
               <div className="flex items-center gap-1.5 mt-2 text-xs text-slate-500 dark:text-slate-400">
@@ -140,9 +185,14 @@ const ReminderItem: React.FC<ReminderItemProps> = ({ reminder, onToggleStatus, o
         </div>
         <div className="flex gap-1">
           {!isDone && (
-            <button onClick={onEdit} className="p-2 text-slate-500 hover:text-primary-600 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Editar lembrete">
-              <Edit size={18} />
-            </button>
+            <>
+              <button onClick={onExport} className="p-2 text-slate-500 hover:text-blue-600 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Exportar para Google Calendar">
+                <Share2 size={18} />
+              </button>
+              <button onClick={onEdit} className="p-2 text-slate-500 hover:text-primary-600 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Editar lembrete">
+                <Edit size={18} />
+              </button>
+            </>
           )}
           <button onClick={onDelete} className="p-2 text-slate-500 hover:text-red-600 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Excluir lembrete">
             <Trash2 size={18} />

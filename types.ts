@@ -40,6 +40,13 @@ export type Reminder = {
   subtasks?: Subtask[];
   status: ReminderStatus;
   recurrence: Recurrence;
+  icon?: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type ImageAiRule = {
+  id?: number;
+  name: string;
+  instructions: string;
 };

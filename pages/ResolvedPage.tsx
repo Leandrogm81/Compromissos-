@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import type { AppView } from '../App';
 import { Page } from '../App';
@@ -32,6 +31,8 @@ const ResolvedPage: React.FC<ResolvedPageProps> = ({ setView, onViewImage }) => 
             onDelete={deleteReminder}
             onEdit={(id) => setView({ page: Page.Form, reminderId: id.toString() })} // Editing is disabled in ReminderItem, but prop is needed
             onViewImage={onViewImage}
+            onUpdateSubtaskStatus={(reminderId, subtaskId, done) => {}}
+            onExport={() => {}} // Export is not applicable for resolved items
           />
         ) : (
           <div className="text-center py-16">
